@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run .NET Web API",
+			"type": "shell",
+			"command": "dotnet run --no-build --urls=http://localhost:5000",
+			"args": [],
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}

@@ -1,0 +1,6 @@
+@NotAlone_HostAddress = http://localhost:5049
+
+GET {{NotAlone_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
