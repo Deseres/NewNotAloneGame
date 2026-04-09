@@ -31,3 +31,7 @@ C:\NewNotAloneGame\obj\Debug\net10.0\refint\NotAlone.dll
 C:\NewNotAloneGame\obj\Debug\net10.0\NotAlone.pdb
 C:\NewNotAloneGame\obj\Debug\net10.0\NotAlone.genruntimeconfig.cache
 C:\NewNotAloneGame\obj\Debug\net10.0\ref\NotAlone.dll
+C:\NewNotAloneGame\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
+C:\NewNotAloneGame\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\NewNotAloneGame\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\NewNotAloneGame\obj\Debug\net10.0\NotAlone.sourcelink.json
