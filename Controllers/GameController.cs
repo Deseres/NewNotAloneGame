@@ -7,10 +7,12 @@ using NotAlone.Services;
 public class GameController : ControllerBase
 {
     private readonly GameStore _store;
+    private readonly GameEngine _engine;
 
     public GameController(GameStore store)
     {
         _store = store;
+        _engine = new GameEngine();
     }
 
     [HttpPost("start")]
@@ -30,35 +32,7 @@ public class GameController : ControllerBase
         if (session.IsGameOver)
             return BadRequest("The game is already over.");
 
-        // 1. AI Choice (The Creature)
-        var creatureChoice = Random.Shared.Next(1, 6);
-        session.LastCreatureChoice = creatureChoice;
-
-        // 2. Resolution Logic
-        if (playerLocation == creatureChoice)
-        {
-            session.PlayerWillpower--;
-            session.CreatureProgress++;
-            session.StatusMessage = $"Caught! The Creature was at {creatureChoice}.";
-        }
-        else
-        {
-            session.PlayerProgress++;
-            session.StatusMessage = $"Safe. You visited {playerLocation}, Creature was at {creatureChoice}.";
-        }
-
-        // 3. Victory Check
-        if (session.PlayerWillpower <= 0 || session.CreatureProgress >= GameSession.MaxProgress)
-        {
-            session.IsGameOver = true;
-            session.StatusMessage = "The Creature has assimilated you.";
-        }
-        else if (session.PlayerProgress >= GameSession.MaxProgress)
-        {
-            session.IsGameOver = true;
-            session.StatusMessage = "Rescue has arrived! You escaped Artemia.";
-        }
-
+        _engine.PlayRound(session, playerLocation);
         return Ok(session);
     }
 }

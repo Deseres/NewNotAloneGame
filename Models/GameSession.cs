@@ -9,7 +9,17 @@ public class GameSession
     public int? LastCreatureChoice { get; set; }
     public bool IsGameOver { get; set; } = false;
     public string StatusMessage { get; set; } = "Game Started. Survival is unlikely.";
+
+
+    // All possible locations
+    public int[] Locations { get; } = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+
+    // Player's available and used locations
+    public List<int> AvailableLocations { get; set; } = new List<int> { 1, 2, 3, 4, 5 };
+    public List<int> UsedLocations { get; set; } = new List<int>();
+
+
     
     // Winning thresholds
-    public const int MaxProgress = 10;
+    public const int MaxProgress = 7;
 }
