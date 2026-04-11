@@ -25,6 +25,9 @@ public class TradeController : ControllerBase
         if (session.IsGameOver)
             return BadRequest("The game is already over.");
 
+        if (session.CurrentPhase != GamePhase.Selection)
+            return BadRequest("This action is only allowed in Selection phase.");
+
         if (request == null)
             return BadRequest("Request body is required.");
 
@@ -34,7 +37,7 @@ public class TradeController : ControllerBase
         // 3 WP = GiveUp, chosen locations are ignored
         if (request.GivenWillpower == 3)
         {
-            _engine.Resist(session, request.GivenWillpower, request.ChosenLocations);
+            _engine.Resist(session, request.GivenWillpower, request.ChosenLocations ?? Array.Empty<int>());
             return Ok(session);
         }
 
@@ -63,6 +66,9 @@ public class TradeController : ControllerBase
 
         if (session.IsGameOver)
             return BadRequest("The game is already over.");
+
+        if (session.CurrentPhase != GamePhase.Selection)
+            return BadRequest("This action is only allowed in Selection phase.");
 
         _engine.GiveUp(session);
         return Ok(session);

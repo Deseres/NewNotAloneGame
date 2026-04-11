@@ -1,5 +1,7 @@
 namespace NotAlone.Models;
 
+public enum GamePhase { Selection, Result, GameOver }
+
 public class GameSession
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -7,8 +9,17 @@ public class GameSession
     public int PlayerProgress { get; set; } = 0;
     public int CreatureProgress { get; set; } = 0;
     public int? LastCreatureChoice { get; set; }
+    public int? LastPlayerChoice { get; set; }
     public bool IsGameOver { get; set; } = false;
+    public bool IsBeaconLit { get; set; } = false;
+    // River vision: when true, next round the Creature's move will be visible to player
+    public bool IsRiverVisionActive { get; set; } = false;
+    // Internal: indicates that the next-round pre-generation (reveal) has been done
+    public bool IsRiverVisionRevealed { get; set; } = false;
     public string StatusMessage { get; set; } = "Game Started. Survival is unlikely.";
+
+    // Current game phase
+    public GamePhase CurrentPhase { get; set; } = GamePhase.Selection;
 
 
     // All possible locations
