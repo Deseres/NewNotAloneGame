@@ -3,17 +3,19 @@ using NotAlone.Models;
 using NotAlone.Services;
 using System.Linq;
 
+namespace NotAlone.Controllers;
+
 [ApiController]
 [Route("api/game")]
 public class TradeController : ControllerBase
 {
     private readonly GameStore _store;
-    private readonly GameEngine _engine;
+    private readonly TradeService _tradeService;
 
-    public TradeController(GameStore store)
+    public TradeController(GameStore store, TradeService tradeService)
     {
         _store = store;
-        _engine = new GameEngine();
+        _tradeService = tradeService;
     }
 
     [HttpPost("{id}/resist")]
@@ -37,7 +39,7 @@ public class TradeController : ControllerBase
         // 3 WP = GiveUp, chosen locations are ignored
         if (request.GivenWillpower == 3)
         {
-            _engine.Resist(session, request.GivenWillpower, request.ChosenLocations ?? Array.Empty<int>());
+            _tradeService.GiveUp(session);
             return Ok(session);
         }
 
@@ -54,7 +56,7 @@ public class TradeController : ControllerBase
                 return BadRequest("Chosen locations must be from the session's used locations.");
         }
 
-        _engine.Resist(session, request.GivenWillpower, request.ChosenLocations);
+        _tradeService.Resist(session, request.GivenWillpower, request.ChosenLocations);
         return Ok(session);
     }
 
@@ -70,7 +72,7 @@ public class TradeController : ControllerBase
         if (session.CurrentPhase != GamePhase.Selection)
             return BadRequest("This action is only allowed in Selection phase.");
 
-        _engine.GiveUp(session);
+        _tradeService.GiveUp(session);
         return Ok(session);
     }
 }

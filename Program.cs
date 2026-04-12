@@ -7,8 +7,11 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// РЕГИСТРИРУЕМ ТВОЙ СТОР (Без этого контроллер упадет)
+// РЕГИСТРИРУЕМ СЕРВИСЫ
 builder.Services.AddSingleton<GameStore>();
+builder.Services.AddSingleton<GameEngine>();
+builder.Services.AddSingleton<SurvivalService>();
+builder.Services.AddSingleton<TradeService>();
 
 var app = builder.Build();
 

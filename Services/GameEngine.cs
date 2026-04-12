@@ -5,6 +5,13 @@ namespace NotAlone.Services;
 
 public class GameEngine
 {
+	private readonly TradeService _tradeService;
+
+	public GameEngine(TradeService? tradeService = null)
+	{
+		_tradeService = tradeService ?? new TradeService();
+	}
+
 	// Helper: apply Jungle effect (find random used location excluding currentCardId,
 	// restore it to available, and indicate that the player's card should be preserved)
 	private (bool shouldPreserve, string message) ApplyJungleEffect(GameSession session, int currentCardId)
@@ -71,124 +78,64 @@ public class GameEngine
 		}
 	}
 
-	public void Resist(GameSession session, int givenWillpower, int[] chosenLocations)
-	{
-		if (session == null)
-			return;
-
-		var maxAllowed = givenWillpower == 2 ? 4 : 2;
-		if (chosenLocations == null || chosenLocations.Length < 1 || chosenLocations.Length > maxAllowed)
-		{
-			session.StatusMessage = $"You must choose between 1 and {maxAllowed} locations to restore.";
-			return;
-		}
-
-		if (givenWillpower < 1 || givenWillpower > 2)
-		{
-			session.StatusMessage = "Invalid willpower choice. Please choose between 1 and 3.";
-			return;
-		}
-
-		// apply willpower cost
-		if (givenWillpower == 1)
-		{
-			session.PlayerWillpower--;
-			session.StatusMessage = "You resisted with 1 willpower, but the Creature is getting stronger.";
-		}
-		else // givenWillpower == 2
-		{
-			session.PlayerWillpower -= 2;
-			session.StatusMessage = "You resisted with 2 willpower, but the Creature is rapidly assimilating you.";
-		}
-
-		// If willpower drops to zero or below, immediately give up
-		if (session.PlayerWillpower <= 0)
-		{
-			GiveUp(session);
-			return;
-		}
-
-		// restore the chosen locations
-		foreach (var loc in chosenLocations)
-		{
-			session.UsedLocations.Remove(loc);
-			if (!session.AvailableLocations.Contains(loc))
-				session.AvailableLocations.Add(loc);
-		}
-
-		session.StatusMessage += " Chosen locations have been restored.";
-	}
-    public void GiveUp(GameSession session)
-    {
-        session.PlayerWillpower = 3;
-        session.UsedLocations.Clear();
-        session.AvailableLocations = new List<int> { 1, 2, 3, 4, 5 };
-        session.CreatureProgress ++;
-        session.StatusMessage = "You have given up. Regain all your cards.";
-    }
 	public void PlayRound(GameSession session, int playerLocation)
 	{
-		// remember player's selection for later (Result phase)
+		// Remember player's selection for later (Result phase)
 		session.LastPlayerChoice = playerLocation;
 
 		// Only allow player to pick from available locations
 		if (!session.AvailableLocations.Contains(playerLocation))
 		{
-			session.StatusMessage = $"Invalid move. Location {playerLocation} is not available.";
+			session.StatusMessage = $"[Selection] ❌ Локация {playerLocation} недоступна. Доступные: {string.Join(", ", session.AvailableLocations)}";
 			return;
-		}
-
-		// Creature chooses from all possible locations unless river vision has pre-generated the choice
-		int creatureChoice;
-		if (session.IsRiverVisionActive && session.IsRiverVisionRevealed && session.LastCreatureChoice.HasValue)
-		{
-			creatureChoice = session.LastCreatureChoice.Value;
-		}
-		else
-		{
-			var creatureIdx = Random.Shared.Next(session.AvailableLocations.Count);
-			creatureChoice = session.AvailableLocations[creatureIdx];
-			session.LastCreatureChoice = creatureChoice;
-		}
-
-		// 2. Resolution Logic
-		if (playerLocation == creatureChoice)
-		{
-			session.PlayerWillpower--;
-			session.CreatureProgress++;
-			session.StatusMessage = $"Caught! The Creature was at {creatureChoice}.";
-
-			// If willpower drops to zero or below, immediately give up
-			if (session.PlayerWillpower <= 0)
-			{
-				GiveUp(session);
-				return;
-			}
-		}
-		else
-		{
-			session.PlayerProgress++;
-			session.StatusMessage = $"Safe. You visited {playerLocation}, Creature was at {creatureChoice}.";
 		}
 
 		// Move played location from available to used for player only
 		session.AvailableLocations.Remove(playerLocation);
 		session.UsedLocations.Add(playerLocation);
 
-		// 3. Victory Check
-		if (session.CreatureProgress >= GameSession.MaxProgress)
-		{
-			session.IsGameOver = true;
-			session.StatusMessage = "The Creature has assimilated you.";
-		}
-		else if (session.PlayerProgress >= GameSession.MaxProgress)
-		{
-			session.IsGameOver = true;
-			session.StatusMessage = "Rescue has arrived! You escaped Artemia.";
-		}
+		session.StatusMessage = $"[Selection] ✓ Вы выбрали локацию {playerLocation}. Ожидание выбора Существа...";
 	}
-    public void ResolveRound(GameSession session)
-    {
+
+	public void SelectCreatureLocation(GameSession session)
+	{
+		if (session == null) return;
+
+		// Creature chooses from all possible locations unless river vision has pre-generated the choice
+		int creatureChoice;
+		string selectionLogic = "";
+		
+		if (session.IsRiverVisionActive && session.IsRiverVisionRevealed && session.LastCreatureChoice.HasValue)
+		{
+			creatureChoice = session.LastCreatureChoice.Value;
+			selectionLogic = "(Видение реки - предсказано)";
+		}
+		else
+		{
+			if (session.IsFogActive == true)
+			{
+				var combined = session.AvailableLocations.Concat(session.UsedLocations).ToList();
+				var creatureIdx = Random.Shared.Next(combined.Count);
+				creatureChoice = combined[creatureIdx];
+				session.LastCreatureChoice = creatureChoice;
+				selectionLogic = $"(Туман - выбор из {combined.Count} мест)";
+			}
+			else
+			{
+				var creatureIdx = Random.Shared.Next(session.AvailableLocations.Count);
+				creatureChoice = session.AvailableLocations[creatureIdx];
+				session.LastCreatureChoice = creatureChoice;
+				selectionLogic = $"(Обычный выбор из {session.AvailableLocations.Count} доступных)";
+			}
+		}
+
+		// Store creature's chosen location for deferred comparison in ResolveRound
+		session.CreatureChosenLocation = creatureChoice;
+		session.StatusMessage = $"[CreatureTurn] ✓ Существо выбрало локацию {creatureChoice} {selectionLogic}. Переход в Result фазу...";
+	}
+
+	public void ResolveRound(GameSession session)
+	{
 		// Only run result-phase effects when we're in Result phase
 		if (session == null)
 			return;
@@ -198,7 +145,48 @@ public class GameEngine
 
 		// Prepare choices
 		var playerChoice = session.LastPlayerChoice;
-		var creatureChoice = session.LastCreatureChoice;
+		var creatureChoice = session.CreatureChosenLocation; // Use deferred creature choice
+
+		// Perform the actual comparison (creature vs player)
+		if (playerChoice.HasValue && creatureChoice.HasValue)
+		{
+			if (playerChoice.Value == creatureChoice.Value)
+			{
+				session.PlayerWillpower--;
+				session.CreatureProgress++;
+				session.StatusMessage = $"[Result] ⚠️ ПОЙМАЛИ! И Вы, и Существо выбрали локацию {creatureChoice}. " +
+					$"Потеряна 1 воля (осталось {session.PlayerWillpower}). " +
+					$"Существо: {session.CreatureProgress}/{GameSession.MaxProgress} к ассимиляции.";
+
+				// If willpower drops to zero or below, immediately give up
+				if (session.PlayerWillpower <= 0)
+				{
+					_tradeService.GiveUp(session);
+					return;
+				}
+			}
+			else
+			{
+				session.PlayerProgress++;
+				session.StatusMessage = $"[Result] ✓ СПАСЛИСЬ! Вы в локации {playerChoice}, Существо в {creatureChoice}. " +
+					$"Прогресс спасения: {session.PlayerProgress}/{GameSession.MaxProgress}.";
+			}
+
+			// Victory Check after comparison
+			if (session.CreatureProgress >= GameSession.MaxProgress)
+			{
+				session.IsGameOver = true;
+				session.StatusMessage = "💀 КОНЕЦ ИГРЫ: Существо вас ассимилировало. Вы поражены.";
+				return;
+			}
+			else if (session.PlayerProgress >= GameSession.MaxProgress)
+			{
+				session.IsGameOver = true;
+				session.StatusMessage = "🚀 КОНЕЦ ИГРЫ: Спасение прибыло! Вы сбежали из Артемии!";
+				return;
+			}
+		}
+
 		var wasCaught = playerChoice.HasValue && creatureChoice.HasValue && playerChoice.Value == creatureChoice.Value;
 
 		// Flag to indicate whether the player's played card should return to hand (available)
@@ -221,7 +209,7 @@ public class GameEngine
 				session.StatusMessage = "Вы зашли в самое Логово Существа! Это была ошибка. Потеряно 2 воли";
 				if (session.PlayerWillpower <= 0)
 				{
-					GiveUp(session);
+					_tradeService.GiveUp(session);
 					return;
 				}
 			}
@@ -260,24 +248,24 @@ public class GameEngine
 					{
 						var cc = creatureChoice.Value;
 						string effectMsg = string.Empty;
-							if (cc == 2)
-							{
-								var (preserve, jmsg) = ApplyJungleEffect(session, 1); // currentCardId = 1 so Lair doesn't restore itself
-								if (preserve) shouldReturnToHand = true;
-								effectMsg = jmsg;
-							}
-							else if (cc == 3)
-							{
-								effectMsg = ApplyRiverEffect(session);
-							}
-							else if (cc == 4)
-								effectMsg = ApplyBeachForPlayer(session);
-							else if (cc == 5)
-							{
-								effectMsg = ApplyRoverEffect(session);
-							}
-							else
-								effectMsg = $"Эффект локации {cc} не реализован для копирования.";
+						if (cc == 2)
+						{
+							var (preserve, jmsg) = ApplyJungleEffect(session, 1); // currentCardId = 1 so Lair doesn't restore itself
+							if (preserve) shouldReturnToHand = true;
+							effectMsg = jmsg;
+						}
+						else if (cc == 3)
+						{
+							effectMsg = ApplyRiverEffect(session);
+						}
+						else if (cc == 4)
+							effectMsg = ApplyBeachForPlayer(session);
+						else if (cc == 5)
+						{
+							effectMsg = ApplyRoverEffect(session);
+						}
+						else
+							effectMsg = $"Эффект локации {cc} не реализован для копирования.";
 						
 						session.StatusMessage = $"Пока Существо охотилось в другом месте, вы обыскали его Логово и использовали возможности локации {cc}. {effectMsg}";
 					}
@@ -305,5 +293,10 @@ public class GameEngine
 			session.IsRiverVisionRevealed = false;
 			session.StatusMessage += " Видение реки использовано и больше не активно.";
 		}
-    }
+		if (session.IsFogActive)
+		{
+			session.IsFogActive = false;
+			session.StatusMessage += " Туман рассеялся и больше не активен.";
+		}
+	}
 }

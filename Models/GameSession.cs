@@ -1,6 +1,6 @@
 namespace NotAlone.Models;
 
-public enum GamePhase { Selection, Result, GameOver }
+public enum GamePhase { Selection, CreatureTurn, Result, GameOver }
 
 public class GameSession
 {
@@ -16,11 +16,18 @@ public class GameSession
     public bool IsRiverVisionActive { get; set; } = false;
     // Internal: indicates that the next-round pre-generation (reveal) has been done
     public bool IsRiverVisionRevealed { get; set; } = false;
+
+    public bool IsFogActive { get; set; } = false;
+
     public string StatusMessage { get; set; } = "Game Started. Survival is unlikely.";
 
     // Current game phase
     public GamePhase CurrentPhase { get; set; } = GamePhase.Selection;
 
+    // Survival Cards
+    public List<int> PlayerHand { get; set; } = new();
+    public List<int> UsedSurvivalCards { get; set; } = new();
+    public List<int> ActiveCardEffects { get; set; } = new();
 
     // All possible locations
     public int[] Locations { get; } = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
@@ -29,8 +36,9 @@ public class GameSession
     public List<int> AvailableLocations { get; set; } = new List<int> { 1, 2, 3, 4, 5 };
     public List<int> UsedLocations { get; set; } = new List<int>();
 
+    // Creature's chosen location (for deferred comparison in ResolveRound)
+    public int? CreatureChosenLocation { get; set; }
 
-    
     // Winning thresholds
     public const int MaxProgress = 7;
 }

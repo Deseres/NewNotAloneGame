@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using NotAlone.Models;
 using NotAlone.Services;
 
+namespace NotAlone.Controllers;
+
 [ApiController]
 [Route("api/[controller]")]
 public class GameController : ControllerBase
@@ -9,58 +11,85 @@ public class GameController : ControllerBase
     private readonly GameStore _store;
     private readonly GameEngine _engine;
 
-    public GameController(GameStore store)
+    public GameController(GameStore store, GameEngine engine)
     {
         _store = store;
-        _engine = new GameEngine();
+        _engine = engine;
     }
 
     [HttpPost("start")]
     public ActionResult<GameSession> StartGame()
     {
         var session = new GameSession();
+        // Give player all survival cards for testing (IDs 1-5)
+        session.PlayerHand = [1, 2, 3, 4, 5];
+        session.StatusMessage = "🎮 Игра началась! Выживание маловероятно. Выберите локацию для начала.";
         _store.Sessions[session.Id] = session;
-        return Ok(session);
+        return Ok(new { message = session.StatusMessage, session = session });
     }
 
     [HttpPost("{id}/play")]
     public ActionResult<GameSession> PlayRound(Guid id, [FromBody] int playerLocation)
     {
         if (!_store.Sessions.TryGetValue(id, out var session))
-            return NotFound("Game session not found.");
+            return NotFound(new { error = "❌ Игровая сессия не найдена." });
 
         if (session.IsGameOver)
-            return BadRequest("The game is already over.");
+            return BadRequest(new { error = "❌ Игра уже завершена." });
 
         if (session.CurrentPhase != GamePhase.Selection)
-            return BadRequest("PlayRound is only allowed in Selection phase.");
+            return BadRequest(new { error = $"❌ Выбор локации допускается только в фазе Selection. Текущая фаза: {session.CurrentPhase}." });
 
         _engine.PlayRound(session, playerLocation);
 
-        // move to Result phase after resolving the play
+        // move to CreatureTurn phase
+        session.CurrentPhase = GamePhase.CreatureTurn;
+
+        return Ok(new { message = session.StatusMessage, session = session });
+    }
+
+    [HttpPost("{id}/creature-turn")]
+    public ActionResult<GameSession> CreatureTurn(Guid id)
+    {
+        if (!_store.Sessions.TryGetValue(id, out var session))
+            return NotFound(new { error = "❌ Игровая сессия не найдена." });
+
+        if (session.IsGameOver)
+            return BadRequest(new { error = "❌ Игра уже завершена." });
+
+        if (session.CurrentPhase != GamePhase.CreatureTurn)
+            return BadRequest(new { error = $"❌ Выбор Существа допускается только в фазе CreatureTurn. Текущая фаза: {session.CurrentPhase}." });
+
+        _engine.SelectCreatureLocation(session);
+
+        // move to Result phase
         session.CurrentPhase = GamePhase.Result;
 
-        // run result-phase effects (special locations, events)
-        _engine.ResolveRound(session);
-
-        return Ok(session);
+        return Ok(new { message = session.StatusMessage, session = session });
     }
 
     [HttpPost("{id}/next-round")]
     public ActionResult<GameSession> NextRound(Guid id)
     {
         if (!_store.Sessions.TryGetValue(id, out var session))
-            return NotFound("Game session not found.");
+            return NotFound(new { error = "❌ Игровая сессия не найдена." });
 
         if (session.IsGameOver)
-            return BadRequest("The game is already over.");
+            return BadRequest(new { error = "❌ Игра уже завершена." });
 
         if (session.CurrentPhase != GamePhase.Result)
-            return BadRequest("NextRound is only allowed in Result phase.");
+            return BadRequest(new { error = $"❌ Переход к следующему раунду допускается только в фазе Result. Текущая фаза: {session.CurrentPhase}." });
 
+        // First, run result-phase effects (special locations, card effects)
+        _engine.ResolveRound(session);
+
+        if (session.IsGameOver)
+            return Ok(new { message = session.StatusMessage, session = session });
+
+        // If game continues, move to next Selection phase
         session.CurrentPhase = GamePhase.Selection;
 
-        // If river vision is active, pre-generate the Creature's move so player can see it before choosing
+        // If river vision is active, pre-generate the Creature's move for next round
         if (session.IsRiverVisionActive && !session.IsRiverVisionRevealed)
         {
             if (session.AvailableLocations.Count > 0)
@@ -69,12 +98,12 @@ public class GameController : ControllerBase
                 var preChoice = session.AvailableLocations[idx];
                 session.LastCreatureChoice = preChoice;
                 session.IsRiverVisionRevealed = true;
-                session.StatusMessage = $"Видение реки активно: Существо пойдёт на {preChoice}. Выберите вашу локацию.";
-                return Ok(session);
+                session.StatusMessage = $"[NextRound] 👁️ Видение реки активно: Существо пойдёт на локацию {preChoice}. Выберите вашу локацию.";
+                return Ok(new { message = session.StatusMessage, session = session });
             }
         }
 
-        session.StatusMessage = "New round. Make your selection.";
-        return Ok(session);
+        session.StatusMessage = "[NextRound] ▶️ Новый раунд начался. Выберите вашу локацию.";
+        return Ok(new { message = session.StatusMessage, session = session });
     }
 }
