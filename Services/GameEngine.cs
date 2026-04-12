@@ -36,6 +36,46 @@ public class GameEngine
 		return (true, "Джунгли не нашли использованных карт для восстановления.");
 	}
 
+	private (bool shouldPreserve, string message) ApplySwampEffect(GameSession session, int currentCardId)
+	{
+		if (session == null)
+			return (false, string.Empty);
+
+		var candidates = session.UsedLocations.Where(x => x != currentCardId).ToList();
+		int restored = 0;
+		
+		for (int i = 0; i < 2 && candidates.Count > 0; i++)
+		{
+			var idx = Random.Shared.Next(candidates.Count);
+			var toRestore = candidates[idx];
+			candidates.RemoveAt(idx);
+			session.UsedLocations.Remove(toRestore);
+			if (!session.AvailableLocations.Contains(toRestore))
+				session.AvailableLocations.Add(toRestore);
+			restored++;
+		}
+
+		var msg = restored > 0 
+			? $"Болото восстановило {restored} карт."
+			: "Болото не нашли использованных карт для восстановления.";
+		
+		return (true, msg);
+	}
+
+	// Helper: apply Shelter effect (generate random survival card)
+	private (bool shouldPreserve, string message) ApplyShelterEffect(GameSession session)
+	{
+		if (session == null)
+			return (false, string.Empty);
+
+		var randomCardType = (SurvivalCardType)Random.Shared.Next(Enum.GetValues(typeof(SurvivalCardType)).Length);
+		var cardId = (int)randomCardType;
+		
+		session.AvailableSurvivalCards.Add(cardId);
+		
+		return (true, $"Убежище предоставило вам карту выживания: {randomCardType}.");
+	}
+
 	// Helper: apply River effect (enable river vision for next round)
 	private string ApplyRiverEffect(GameSession session)
 	{
@@ -241,6 +281,17 @@ public class GameEngine
 					var rmsg = ApplyRoverEffect(session);
 					session.StatusMessage += " " + rmsg;
 				}
+				else if (playerChoice.Value == 6)
+				{
+					var (preserve, msg) = ApplySwampEffect(session, playerChoice.Value);
+					if (preserve) shouldReturnToHand = true;
+					session.StatusMessage += " " + msg;
+				}
+				else if (playerChoice.Value == 7)
+				{
+					var (preserve, msg) = ApplyShelterEffect(session);
+					session.StatusMessage += " " + msg;
+				}
 				else if (playerChoice.Value == 1)
 				{
 					// Lair copying: copy creature's location effect
@@ -263,6 +314,17 @@ public class GameEngine
 						else if (cc == 5)
 						{
 							effectMsg = ApplyRoverEffect(session);
+						}
+						else if (cc == 6)
+						{
+							var (preserve, smsg) = ApplySwampEffect(session, 1);
+							if (preserve) shouldReturnToHand = true;
+							effectMsg = smsg;
+						}
+						else if (cc == 7)
+						{
+							var (preserve, sheltermsg) = ApplyShelterEffect(session);
+							effectMsg = sheltermsg;
 						}
 						else
 							effectMsg = $"Эффект локации {cc} не реализован для копирования.";

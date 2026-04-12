@@ -23,7 +23,7 @@ public class SurvivalController : ControllerBase
         if (!_gameStore.Sessions.TryGetValue(id, out var session))
             return NotFound(new { error = "❌ Игровая сессия не найдена." });
 
-        if (!session.PlayerHand.Contains(cardId))
+        if (!session.AvailableSurvivalCards.Contains(cardId))
             return BadRequest(new { error = $"❌ Карта {cardId} не в вашей руке." });
 
         var card = _survivalService.GetCardById(cardId);
@@ -36,13 +36,26 @@ public class SurvivalController : ControllerBase
         var targetLocations = request?.TargetLocationIds;
         var direction = request?.Direction;
 
-        // Reject requests with target locations for non-LocationsRegen cards
-        if (targetLocations != null && targetLocations.Count > 0 && card.Type != SurvivalCardType.LocationsRegen)
-            return BadRequest(new { error = "❌ Эта карта не поддерживает целевые локации." });
+        // Reject if body was provided but contains unexpected fields for this card type
+        if (request != null)
+        {
+            bool hasTargetLocations = targetLocations != null && targetLocations.Count > 0;
+            bool hasDirection = direction != null;
+            
+            // If body is provided but contains fields not needed for this card, reject it
+            if (!hasTargetLocations && !hasDirection)
+                return BadRequest(new { error = "❌ Это карта не требует параметров. Отправьте запрос без тела (body)." });
 
-        // Reject requests with direction for non-MoveTarget cards
-        if (direction != null && card.Type != SurvivalCardType.MoveTarget)
-            return BadRequest(new { error = "❌ Эта карта не поддерживает параметр направления." });
+            if (hasTargetLocations && card.Type != SurvivalCardType.LocationsRegen)
+                return BadRequest(new { error = "❌ Эта карта не поддерживает целевые локации. Отправьте запрос без тела." });
+
+            if (hasDirection && card.Type != SurvivalCardType.MoveTarget)
+                return BadRequest(new { error = "❌ Эта карта не поддерживает параметр направления. Отправьте запрос без тела." });
+        }
+
+        // Validate that target locations don't contain invalid location 0
+        if (targetLocations != null && targetLocations.Any(id => id <= 0))
+            return BadRequest(new { error = "❌ Номер локации должен быть больше 0." });
 
         // Validate direction for MoveTarget card
         if (card.Type == SurvivalCardType.MoveTarget && direction == null)
@@ -60,7 +73,7 @@ public class SurvivalController : ControllerBase
         _survivalService.ApplyEffect(session, card, targetLocations, direction);
 
         // Remove from hand and move to used
-        session.PlayerHand.Remove(cardId);
+        session.AvailableSurvivalCards.Remove(cardId);
         session.UsedSurvivalCards.Add(cardId);
 
         return Ok(new 

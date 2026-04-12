@@ -22,7 +22,7 @@ public class GameController : ControllerBase
     {
         var session = new GameSession();
         // Give player all survival cards for testing (IDs 1-5)
-        session.PlayerHand = [1, 2, 3, 4, 5];
+        session.AvailableSurvivalCards = new List<int> { 1, 2, 3, 4, 5 };
         session.StatusMessage = "🎮 Игра началась! Выживание маловероятно. Выберите локацию для начала.";
         _store.Sessions[session.Id] = session;
         return Ok(new { message = session.StatusMessage, session = session });

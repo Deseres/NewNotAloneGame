@@ -25,7 +25,9 @@ public class GameSession
     public GamePhase CurrentPhase { get; set; } = GamePhase.Selection;
 
     // Survival Cards
-    public List<int> PlayerHand { get; set; } = new();
+    public List<int> AvailableSurvivalCards { get; set; } = new();
+
+    public List<int> SurvivalCards { get; set; } = new List<int> { 1, 2, 3, 4, 5 };
     public List<int> UsedSurvivalCards { get; set; } = new();
     public List<int> ActiveCardEffects { get; set; } = new();
 
@@ -33,7 +35,7 @@ public class GameSession
     public int[] Locations { get; } = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
     // Player's available and used locations
-    public List<int> AvailableLocations { get; set; } = new List<int> { 1, 2, 3, 4, 5 };
+    public List<int> AvailableLocations { get; set; } = new List<int> { 1, 2, 3, 4, 5, 6, 7 };
     public List<int> UsedLocations { get; set; } = new List<int>();
 
     // Creature's chosen location (for deferred comparison in ResolveRound)
