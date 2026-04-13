@@ -148,7 +148,7 @@ public class GameEngine
 	}
 
 	// Helper: apply creature modifier effects
-	private void ApplyCreatureModifier(GameSession session, int playerChoice, int creatureChoice)
+	internal void ApplyCreatureModifier(GameSession session, int playerChoice, int creatureChoice)
 	{
 		if (session == null || session.CurrentModifier == CreatureModifier.None)
 			return;
@@ -158,7 +158,7 @@ public class GameEngine
 			case CreatureModifier.DoubleDamage:
 				if (playerChoice == creatureChoice)
 				{
-					session.CreatureProgress++;
+					session.PlayerWillpower = Math.Max(0, session.PlayerWillpower - 1);
 					session.StatusMessage += $"\n⚠️ [Modifier: Double Damage] Существо наносит дополнительный урон!";
 				}
 				break;
@@ -181,8 +181,40 @@ public class GameEngine
 					session.StatusMessage += $"\n⚠️ [Modifier: Lose Location] Вы потеряли локацию {lost}!";
 				}
 				break;
+			case CreatureModifier.BeachAndWreckBlock:
+				if (playerChoice != creatureChoice) // Only if player escaped
+				{
+					if (playerChoice == 4) // Beach
+					{
+						if (session.IsBeaconLit)
+						{
+							// Beacon was lit, so we cancel the progress gain
+							session.PlayerProgress = Math.Max(0, session.PlayerProgress - 1);
+							session.StatusMessage += $"\n⚠️ [Modifier: Beach Block] Маяк не помог. Прогресс заблокирован!";
+						}
+						else
+						{
+							// Beacon was not lit, so we cancel the lighting effect
+							session.IsBeaconLit = false;
+							session.StatusMessage += $"\n⚠️ [Modifier: Beach Block] Маяк не удалось зажечь!";
+						}
+					}
+					else if (playerChoice == 8) // Wreck
+					{
+						// Wreck gives +1 progress, so we cancel it
+						session.PlayerProgress = Math.Max(0, session.PlayerProgress - 1);
+						session.StatusMessage += $"\n⚠️ [Modifier: Wreck Block] Обломки не помогли. Прогресс заблокирован!";
+					}
+				}
+				break;
+			case CreatureModifier.ExtraCreatureProgress:
+					if (playerChoice == creatureChoice)
+					{
+						session.CreatureProgress = Math.Min(GameSession.MaxCreatureProgress, session.CreatureProgress + 1);
+						session.StatusMessage += $"\n⚠️ [Modifier: Extra Creature Progress] Существо продвигается быстрее!";
+					}
+					break;
 		}
-
 		// Reset modifier for next round
 		session.CurrentModifier = CreatureModifier.None;
 	}

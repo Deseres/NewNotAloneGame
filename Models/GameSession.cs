@@ -7,7 +7,13 @@ public enum CreatureModifier
 	None = 0,
 	DoubleDamage = 1,           // CreatureProgress increases by 2 instead of 1
 	BlockPlayerProgress = 2,    // Player progress won't increase on escape
-	LoseRandomLocation = 3      // Player loses one random available location
+	LoseRandomLocation = 3,      // Player loses one random available location
+
+    BeachAndWreckBlock = 4, //Blocks effect of Beach and Wreck locations
+
+    ExtraCreatureProgress = 5 // Creature progress increases by 2 instead of 1, but player can still progress normally
+
+
 }
 
 public class GameSession

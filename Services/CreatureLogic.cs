@@ -45,7 +45,7 @@ public class CreatureLogic
 		}
 		
 		// Select random modifier for this round
-		var modifiers = new[] { CreatureModifier.DoubleDamage, CreatureModifier.BlockPlayerProgress, CreatureModifier.LoseRandomLocation };
+		var modifiers = new[] { CreatureModifier.DoubleDamage, CreatureModifier.BlockPlayerProgress, CreatureModifier.LoseRandomLocation, CreatureModifier.BeachAndWreckBlock, CreatureModifier.ExtraCreatureProgress };
 		session.CurrentModifier = modifiers[Random.Shared.Next(modifiers.Length)];
 		
         // Apply deferred Artefact effect
