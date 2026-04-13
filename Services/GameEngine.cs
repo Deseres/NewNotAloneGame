@@ -68,8 +68,9 @@ public class GameEngine
 		if (session == null)
 			return (false, string.Empty);
 
-		var randomCardType = (SurvivalCardType)Random.Shared.Next(Enum.GetValues(typeof(SurvivalCardType)).Length);
-		var cardId = (int)randomCardType;
+		// Generate random card ID 1-5 (matching valid card IDs)
+		int cardId = Random.Shared.Next(1, 6);
+		var randomCardType = (SurvivalCardType)(cardId - 1);
 		
 		session.AvailableSurvivalCards.Add(cardId);
 		
@@ -190,10 +191,15 @@ public class GameEngine
 			}
 			else
 			{
-				var creatureIdx = Random.Shared.Next(session.AvailableLocations.Count);
-				creatureChoice = session.AvailableLocations[creatureIdx];
+				// Creature chooses from available locations + player's choice
+				var options = session.AvailableLocations.ToList();
+				if (session.LastPlayerChoice.HasValue && !options.Contains(session.LastPlayerChoice.Value))
+					options.Add(session.LastPlayerChoice.Value);
+				
+				var creatureIdx = Random.Shared.Next(options.Count);
+				creatureChoice = options[creatureIdx];
 				session.LastCreatureChoice = creatureChoice;
-				selectionLogic = $"(Обычный выбор из {session.AvailableLocations.Count} доступных)";
+				selectionLogic = $"(Выбор из {options.Count} доступных + выбор игрока)";
 			}
 		}
 

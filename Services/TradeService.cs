@@ -58,8 +58,17 @@ public class TradeService
             return;
 
         session.PlayerWillpower = 3;
+        
+        // Restore all used locations to available
+        foreach (var location in session.UsedLocations)
+        {
+            if (!session.AvailableLocations.Contains(location))
+            {
+                session.AvailableLocations.Add(location);
+            }
+        }
+        
         session.UsedLocations.Clear();
-        session.AvailableLocations = new List<int> { 1, 2, 3, 4, 5 };
         session.CreatureProgress++;
         session.StatusMessage = "You have given up. Regain all your cards.";
     }
