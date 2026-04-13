@@ -143,8 +143,48 @@ public class GameEngine
 	private string ApplyArtefactEffect(GameSession session)
 	{
 		if (session == null) return string.Empty;
-		session.IsCreaturePowerActive = false;
-		return "Артефакт нейтрализовал силу Существа.";
+		session.IsArtefactActive = true;
+		return "Артефакт активирован: сила Существа будет нейтрализована в следующем раунде.";
+	}
+
+	// Helper: apply creature modifier effects
+	private void ApplyCreatureModifier(GameSession session, int playerChoice, int creatureChoice)
+	{
+		if (session == null || session.CurrentModifier == CreatureModifier.None)
+			return;
+
+		switch (session.CurrentModifier)
+		{
+			case CreatureModifier.DoubleDamage:
+				if (playerChoice == creatureChoice)
+				{
+					session.CreatureProgress++;
+					session.StatusMessage += $"\n⚠️ [Modifier: Double Damage] Существо наносит дополнительный урон!";
+				}
+				break;
+
+			case CreatureModifier.BlockPlayerProgress:
+				if (playerChoice != creatureChoice)
+				{
+					session.PlayerProgress--;
+					session.StatusMessage += $"\n⚠️ [Modifier: Block Progress] Ваш прогресс спасения заблокирован!";
+				}
+				break;
+
+			case CreatureModifier.LoseRandomLocation:
+				if (session.AvailableLocations.Count > 0)
+				{
+					var idx = Random.Shared.Next(session.AvailableLocations.Count);
+					var lost = session.AvailableLocations[idx];
+					session.AvailableLocations.RemoveAt(idx);
+					session.UsedLocations.Add(lost);
+					session.StatusMessage += $"\n⚠️ [Modifier: Lose Location] Вы потеряли локацию {lost}!";
+				}
+				break;
+		}
+
+		// Reset modifier for next round
+		session.CurrentModifier = CreatureModifier.None;
 	}
 
 	public void PlayRound(GameSession session, int playerLocation)
@@ -166,47 +206,7 @@ public class GameEngine
 		session.StatusMessage = $"[Selection] ✓ Вы выбрали локацию {playerLocation}. Ожидание выбора Существа...";
 	}
 
-	public void SelectCreatureLocation(GameSession session)
-	{
-		if (session == null) return;
 
-		// Creature chooses from all possible locations unless river vision has pre-generated the choice
-		int creatureChoice;
-		string selectionLogic = "";
-		
-		if (session.IsRiverVisionActive && session.IsRiverVisionRevealed && session.LastCreatureChoice.HasValue)
-		{
-			creatureChoice = session.LastCreatureChoice.Value;
-			selectionLogic = "(Видение реки - предсказано)";
-		}
-		else
-		{
-			if (session.IsFogActive == true)
-			{
-				var combined = session.AvailableLocations.Concat(session.UsedLocations).ToList();
-				var creatureIdx = Random.Shared.Next(combined.Count);
-				creatureChoice = combined[creatureIdx];
-				session.LastCreatureChoice = creatureChoice;
-				selectionLogic = $"(Туман - выбор из {combined.Count} мест)";
-			}
-			else
-			{
-				// Creature chooses from available locations + player's choice
-				var options = session.AvailableLocations.ToList();
-				if (session.LastPlayerChoice.HasValue && !options.Contains(session.LastPlayerChoice.Value))
-					options.Add(session.LastPlayerChoice.Value);
-				
-				var creatureIdx = Random.Shared.Next(options.Count);
-				creatureChoice = options[creatureIdx];
-				session.LastCreatureChoice = creatureChoice;
-				selectionLogic = $"(Выбор из {options.Count} доступных + выбор игрока)";
-			}
-		}
-
-		// Store creature's chosen location for deferred comparison in ResolveRound
-		session.CreatureChosenLocation = creatureChoice;
-		session.StatusMessage = $"[CreatureTurn] ✓ Существо выбрало локацию {creatureChoice} {selectionLogic}. Переход в Result фазу...";
-	}
 
 	public void ResolveRound(GameSession session)
 	{
@@ -259,6 +259,9 @@ public class GameEngine
 				session.StatusMessage = "🚀 КОНЕЦ ИГРЫ: Спасение прибыло! Вы сбежали из Артемии!";
 				return;
 			}
+
+			// Apply creature modifier
+			ApplyCreatureModifier(session, playerChoice.Value, creatureChoice.Value);
 		}
 
 		var wasCaught = playerChoice.HasValue && creatureChoice.HasValue && playerChoice.Value == creatureChoice.Value;
@@ -420,6 +423,11 @@ public class GameEngine
 		{
 			session.IsFogActive = false;
 			session.StatusMessage += " Туман рассеялся и больше не активен.";
+		}
+		if (session.IsArtefactActive)
+		{
+			session.IsArtefactActive = false;
+			session.StatusMessage += " Артефакт использован и деактивирован.";
 		}
 	}
 }

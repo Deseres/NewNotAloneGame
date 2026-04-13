@@ -2,6 +2,14 @@ namespace NotAlone.Models;
 
 public enum GamePhase { Selection, CreatureTurn, Result, GameOver }
 
+public enum CreatureModifier
+{
+	None = 0,
+	DoubleDamage = 1,           // CreatureProgress increases by 2 instead of 1
+	BlockPlayerProgress = 2,    // Player progress won't increase on escape
+	LoseRandomLocation = 3      // Player loses one random available location
+}
+
 public class GameSession
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -41,7 +49,9 @@ public class GameSession
     // Creature's chosen location (for deferred comparison in ResolveRound)
     public int? CreatureChosenLocation { get; set; }
 
-    public bool IsCreaturePowerActive { get; set; } = false;
+    public bool IsArtefactActive { get; set; } = false;
+
+    public CreatureModifier CurrentModifier { get; set; } = CreatureModifier.None;
 
     // Winning thresholds
     public const int MaxPlayerProgress = 13;

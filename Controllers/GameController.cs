@@ -10,11 +10,13 @@ public class GameController : ControllerBase
 {
     private readonly GameStore _store;
     private readonly GameEngine _engine;
+    private readonly CreatureLogic _creatureLogic;
 
-    public GameController(GameStore store, GameEngine engine)
+    public GameController(GameStore store, GameEngine engine, CreatureLogic creatureLogic)
     {
         _store = store;
         _engine = engine;
+        _creatureLogic = creatureLogic;
     }
 
     [HttpPost("start")]
@@ -61,7 +63,7 @@ public class GameController : ControllerBase
         if (session.CurrentPhase != GamePhase.CreatureTurn)
             return BadRequest(new { error = $"❌ Выбор Существа допускается только в фазе CreatureTurn. Текущая фаза: {session.CurrentPhase}." });
 
-        _engine.SelectCreatureLocation(session);
+        _creatureLogic.SelectCreatureLocation(session);
 
         // move to Result phase
         session.CurrentPhase = GamePhase.Result;

@@ -16,6 +16,7 @@ builder.Services.AddSwaggerGen();
 // РЕГИСТРИРУЕМ СЕРВИСЫ
 builder.Services.AddSingleton<GameStore>();
 builder.Services.AddSingleton<GameEngine>();
+builder.Services.AddSingleton<CreatureLogic>();
 builder.Services.AddSingleton<SurvivalService>();
 builder.Services.AddSingleton<TradeService>();
 
