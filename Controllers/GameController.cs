@@ -21,8 +21,9 @@ public class GameController : ControllerBase
     public ActionResult<GameSession> StartGame()
     {
         var session = new GameSession();
-        // Give player all survival cards for testing (IDs 1-5)
-        session.AvailableSurvivalCards = new List<int> { 1, 2, 3, 4, 5 };
+        // Give player one random survival card (IDs 1-5)
+        int randomCard = Random.Shared.Next(1, 6);
+        session.AvailableSurvivalCards = new List<int> { randomCard };
         session.StatusMessage = "🎮 Игра началась! Выживание маловероятно. Выберите локацию для начала.";
         _store.Sessions[session.Id] = session;
         return Ok(new { message = session.StatusMessage, session = session });

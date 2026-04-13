@@ -118,6 +118,34 @@ public class GameEngine
 		}
 	}
 
+	// Helper: apply Wreck effect (grants player progress)
+	private string ApplyWreck(GameSession session)
+	{
+		if (session == null) return string.Empty;
+		session.PlayerProgress++;
+		return "Обломки помогли вашему спасению (+1 прогресс).";
+	}
+
+	// Helper: apply Source effect (restores willpower)
+	private string ApplySource(GameSession session)
+	{
+		if (session == null) return string.Empty;
+		if (session.PlayerWillpower < GameSession.MaxWillpower)
+		{
+			session.PlayerWillpower++;
+			return "Источник восстановил вашу волю (+1 воля).";
+		}
+		return "Источник не нашёл нужной вам помощи (воля уже максимальна).";
+	}
+
+	// Helper: apply Artefact effect (disables creature power)
+	private string ApplyArtefactEffect(GameSession session)
+	{
+		if (session == null) return string.Empty;
+		session.IsCreaturePowerActive = false;
+		return "Артефакт нейтрализовал силу Существа.";
+	}
+
 	public void PlayRound(GameSession session, int playerLocation)
 	{
 		// Remember player's selection for later (Result phase)
@@ -196,7 +224,7 @@ public class GameEngine
 				session.CreatureProgress++;
 				session.StatusMessage = $"[Result] ⚠️ ПОЙМАЛИ! И Вы, и Существо выбрали локацию {creatureChoice}. " +
 					$"Потеряна 1 воля (осталось {session.PlayerWillpower}). " +
-					$"Существо: {session.CreatureProgress}/{GameSession.MaxProgress} к ассимиляции.";
+					$"Существо: {session.CreatureProgress}/{GameSession.MaxCreatureProgress} к ассимиляции.";
 
 				// If willpower drops to zero or below, immediately give up
 				if (session.PlayerWillpower <= 0)
@@ -209,17 +237,17 @@ public class GameEngine
 			{
 				session.PlayerProgress++;
 				session.StatusMessage = $"[Result] ✓ СПАСЛИСЬ! Вы в локации {playerChoice}, Существо в {creatureChoice}. " +
-					$"Прогресс спасения: {session.PlayerProgress}/{GameSession.MaxProgress}.";
+					$"Прогресс спасения: {session.PlayerProgress}/{GameSession.MaxPlayerProgress}.";
 			}
 
 			// Victory Check after comparison
-			if (session.CreatureProgress >= GameSession.MaxProgress)
+			if (session.CreatureProgress >= GameSession.MaxCreatureProgress)
 			{
 				session.IsGameOver = true;
 				session.StatusMessage = "💀 КОНЕЦ ИГРЫ: Существо вас ассимилировало. Вы поражены.";
 				return;
 			}
-			else if (session.PlayerProgress >= GameSession.MaxProgress)
+			else if (session.PlayerProgress >= GameSession.MaxPlayerProgress)
 			{
 				session.IsGameOver = true;
 				session.StatusMessage = "🚀 КОНЕЦ ИГРЫ: Спасение прибыло! Вы сбежали из Артемии!";
@@ -292,6 +320,21 @@ public class GameEngine
 					var (preserve, msg) = ApplyShelterEffect(session);
 					session.StatusMessage += " " + msg;
 				}
+				else if (playerChoice.Value == 8)
+				{
+					var msg = ApplyWreck(session);
+					session.StatusMessage += " " + msg;
+				}
+				else if (playerChoice.Value == 9)
+				{
+					var msg = ApplySource(session);
+					session.StatusMessage += " " + msg;
+				}
+				else if (playerChoice.Value == 10)
+				{
+					var msg = ApplyArtefactEffect(session);
+					session.StatusMessage += " " + msg;
+				}
 				else if (playerChoice.Value == 1)
 				{
 					// Lair copying: copy creature's location effect
@@ -325,6 +368,18 @@ public class GameEngine
 						{
 							var (preserve, sheltermsg) = ApplyShelterEffect(session);
 							effectMsg = sheltermsg;
+						}
+						else if (cc == 8)
+						{
+							effectMsg = ApplyWreck(session);
+						}
+						else if (cc == 9)
+						{
+							effectMsg = ApplySource(session);
+						}
+						else if (cc == 10)
+						{
+							effectMsg = ApplyArtefactEffect(session);
 						}
 						else
 							effectMsg = $"Эффект локации {cc} не реализован для копирования.";

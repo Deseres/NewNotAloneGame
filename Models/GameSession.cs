@@ -35,12 +35,17 @@ public class GameSession
     public int[] Locations { get; } = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
     // Player's available and used locations
-    public List<int> AvailableLocations { get; set; } = new List<int> { 1, 2, 3, 4, 5, 6, 7 };
+    public List<int> AvailableLocations { get; set; } = new List<int> { 1, 2, 3, 4, 5 };
     public List<int> UsedLocations { get; set; } = new List<int>();
 
     // Creature's chosen location (for deferred comparison in ResolveRound)
     public int? CreatureChosenLocation { get; set; }
 
+    public bool IsCreaturePowerActive { get; set; } = false;
+
     // Winning thresholds
-    public const int MaxProgress = 7;
+    public const int MaxPlayerProgress = 13;
+    public const int MaxCreatureProgress = 7;
+
+    public const int MaxWillpower = 3;
 }
