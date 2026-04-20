@@ -6,10 +6,12 @@ namespace NotAlone.Services;
 public class GameEngine
 {
 	private readonly TradeService _tradeService;
+	private readonly CreatureLogic? _creatureLogic;
 
-	public GameEngine(TradeService? tradeService = null)
+	public GameEngine(TradeService? tradeService = null, CreatureLogic? creatureLogic = null)
 	{
 		_tradeService = tradeService ?? new TradeService();
+		_creatureLogic = creatureLogic;
 	}
 
 	// Helper: apply Jungle effect (find random used location excluding currentCardId,
@@ -103,7 +105,7 @@ public class GameEngine
 	}
 
 	// Helper: apply Beach effect for a player (light beacon or grant progress)
-	private string ApplyBeachForPlayer(GameSession session)
+	private string ApplyBeachForPlayer(GameSession session, bool blockProgress = false)
 	{
 		if (session == null) return string.Empty;
 
@@ -114,8 +116,16 @@ public class GameEngine
 		}
 		else
 		{
-			session.PlayerProgress++;
-			return "Маяк на 4 помог вашему спасению (+1 прогресс).";
+			// Only grant progress if not blocked by modifier
+			if (!blockProgress)
+			{
+				session.PlayerProgress++;
+				return "Маяк на 4 помог вашему спасению (+1 прогресс).";
+			}
+			else
+			{
+				return "Маяк освещает ваш путь, но Существо перекрывает весь прогресс.";
+			}
 		}
 	}
 
@@ -164,11 +174,8 @@ public class GameEngine
 				break;
 
 			case CreatureModifier.BlockPlayerProgress:
-				if (playerChoice != creatureChoice)
-				{
-					session.PlayerProgress--;
-					session.StatusMessage += $"\n⚠️ [Modifier: Block Progress] Ваш прогресс спасения заблокирован!";
-				}
+				// Blocks ALL progress on escape (handled in ResolveRound)
+				session.StatusMessage += $"\n⚠️ [Modifier: Block Progress] Весь Ваш прогресс спасения был заблокирован!";
 				break;
 
 			case CreatureModifier.LoseRandomLocation:
@@ -186,24 +193,11 @@ public class GameEngine
 				{
 					if (playerChoice == 4) // Beach
 					{
-						if (session.IsBeaconLit)
-						{
-							// Beacon was lit, so we cancel the progress gain
-							session.PlayerProgress = Math.Max(0, session.PlayerProgress - 1);
-							session.StatusMessage += $"\n⚠️ [Modifier: Beach Block] Маяк не помог. Прогресс заблокирован!";
-						}
-						else
-						{
-							// Beacon was not lit, so we cancel the lighting effect
-							session.IsBeaconLit = false;
-							session.StatusMessage += $"\n⚠️ [Modifier: Beach Block] Маяк не удалось зажечь!";
-						}
+						session.StatusMessage += $"\n⚠️ [Modifier: Beach Block] Дополнительный эффект Пляжа заблокирован!";
 					}
 					else if (playerChoice == 8) // Wreck
 					{
-						// Wreck gives +1 progress, so we cancel it
-						session.PlayerProgress = Math.Max(0, session.PlayerProgress - 1);
-						session.StatusMessage += $"\n⚠️ [Modifier: Wreck Block] Обломки не помогли. Прогресс заблокирован!";
+						session.StatusMessage += $"\n⚠️ [Modifier: Wreck Block] Дополнительный прогресс от Обломков заблокирован!";
 					}
 				}
 				break;
@@ -215,21 +209,20 @@ public class GameEngine
 					}
 					break;
 		}
-		// Reset modifier for next round
-		session.CurrentModifier = CreatureModifier.None;
+		// Don't reset modifier yet - it's needed for location effects!
 	}
 
 	public void PlayRound(GameSession session, int playerLocation)
 	{
-		// Remember player's selection for later (Result phase)
-		session.LastPlayerChoice = playerLocation;
-
 		// Only allow player to pick from available locations
 		if (!session.AvailableLocations.Contains(playerLocation))
 		{
 			session.StatusMessage = $"[Selection] ❌ Локация {playerLocation} недоступна. Доступные: {string.Join(", ", session.AvailableLocations)}";
 			return;
 		}
+
+		// Remember player's selection for later (Result phase)
+		session.LastPlayerChoice = playerLocation;
 
 		// Move played location from available to used for player only
 		session.AvailableLocations.Remove(playerLocation);
@@ -253,11 +246,22 @@ public class GameEngine
 		var playerChoice = session.LastPlayerChoice;
 		var creatureChoice = session.CreatureChosenLocation; // Use deferred creature choice
 
+		// Apply creature modifier FIRST (before progress changes)
+		if (playerChoice.HasValue && creatureChoice.HasValue)
+		{
+			ApplyCreatureModifier(session, playerChoice.Value, creatureChoice.Value);
+		}
+
+		var wasCaught = playerChoice.HasValue && creatureChoice.HasValue && playerChoice.Value == creatureChoice.Value;
+
 		// Perform the actual comparison (creature vs player)
 		if (playerChoice.HasValue && creatureChoice.HasValue)
 		{
 			if (playerChoice.Value == creatureChoice.Value)
 			{
+				// Record the catch for creature learning
+				_creatureLogic?.RecordCatch(creatureChoice.Value);
+
 				session.PlayerWillpower--;
 				session.CreatureProgress++;
 				session.StatusMessage = $"[Result] ⚠️ ПОЙМАЛИ! И Вы, и Существо выбрали локацию {creatureChoice}. " +
@@ -273,9 +277,24 @@ public class GameEngine
 			}
 			else
 			{
-				session.PlayerProgress++;
+				// Record trap failure if creature was using trap strategy
+				_creatureLogic?.RecordTrapFailure();
+
+				// Check if progress is entirely blocked by BlockPlayerProgress modifier
+				bool progressBlocked = (session.CurrentModifier == CreatureModifier.BlockPlayerProgress);
+				
+				if (!progressBlocked)
+				{
+					session.PlayerProgress++;
+				}
+				
 				session.StatusMessage = $"[Result] ✓ СПАСЛИСЬ! Вы в локации {playerChoice}, Существо в {creatureChoice}. " +
 					$"Прогресс спасения: {session.PlayerProgress}/{GameSession.MaxPlayerProgress}.";
+				
+				if (progressBlocked)
+					session.StatusMessage += " Но весь Ваш прогресс был заблокирован модификатором!";
+				else if (session.CurrentModifier == CreatureModifier.BeachAndWreckBlock && (playerChoice == 4 || playerChoice == 8))
+					session.StatusMessage += " Но дополнительный эффект локации был заблокирован!";
 			}
 
 			// Victory Check after comparison
@@ -291,12 +310,7 @@ public class GameEngine
 				session.StatusMessage = "🚀 КОНЕЦ ИГРЫ: Спасение прибыло! Вы сбежали из Артемии!";
 				return;
 			}
-
-			// Apply creature modifier
-			ApplyCreatureModifier(session, playerChoice.Value, creatureChoice.Value);
 		}
-
-		var wasCaught = playerChoice.HasValue && creatureChoice.HasValue && playerChoice.Value == creatureChoice.Value;
 
 		// Flag to indicate whether the player's played card should return to hand (available)
 		var shouldReturnToHand = false;
@@ -329,6 +343,12 @@ public class GameEngine
 			// Not caught: handle special locations for player's choice
 			if (playerChoice.HasValue)
 			{
+				// Check if location effects should be blocked by BeachAndWreckBlock modifier
+				bool blockLocationBonus = (session.CurrentModifier == CreatureModifier.BeachAndWreckBlock && (playerChoice == 4 || playerChoice == 8));
+				
+				// Also block all location effects if BlockPlayerProgress is active
+				bool blockAllProgress = (session.CurrentModifier == CreatureModifier.BlockPlayerProgress);
+
 				if (playerChoice.Value == 2)
 				{
 					var (preserve, msg) = ApplyJungleEffect(session, playerChoice.Value);
@@ -337,8 +357,16 @@ public class GameEngine
 				}
 				else if (playerChoice.Value == 4)
 				{
-					var msg = ApplyBeachForPlayer(session);
-					session.StatusMessage += " " + msg;
+					if (!blockLocationBonus && !blockAllProgress)
+					{
+						var msg = ApplyBeachForPlayer(session, false);
+						session.StatusMessage += " " + msg;
+					}
+					else if (!blockLocationBonus) // BeachAndWreckBlock doesn't apply, but BlockPlayerProgress does
+					{
+						var msg = ApplyBeachForPlayer(session, blockAllProgress);
+						session.StatusMessage += " " + msg;
+					}
 				}
 				else if (playerChoice.Value == 3)
 				{
@@ -363,8 +391,11 @@ public class GameEngine
 				}
 				else if (playerChoice.Value == 8)
 				{
-					var msg = ApplyWreck(session);
-					session.StatusMessage += " " + msg;
+					if (!blockLocationBonus && !blockAllProgress)
+					{
+						var msg = ApplyWreck(session);
+						session.StatusMessage += " " + msg;
+					}
 				}
 				else if (playerChoice.Value == 9)
 				{
@@ -394,7 +425,12 @@ public class GameEngine
 							effectMsg = ApplyRiverEffect(session);
 						}
 						else if (cc == 4)
-							effectMsg = ApplyBeachForPlayer(session);
+						{
+							if (!blockAllProgress && !blockLocationBonus)
+								effectMsg = ApplyBeachForPlayer(session);							else if (!blockLocationBonus)
+								effectMsg = ApplyBeachForPlayer(session, blockAllProgress);							else
+								effectMsg = "Beach effect blocked by modifier";
+						}
 						else if (cc == 5)
 						{
 							effectMsg = ApplyRoverEffect(session);
@@ -412,7 +448,10 @@ public class GameEngine
 						}
 						else if (cc == 8)
 						{
-							effectMsg = ApplyWreck(session);
+							if (!blockAllProgress && !blockLocationBonus)
+								effectMsg = ApplyWreck(session);
+							else
+								effectMsg = "Wreck effect blocked by modifier";
 						}
 						else if (cc == 9)
 						{
@@ -444,6 +483,9 @@ public class GameEngine
 				session.StatusMessage += $" Карта {pl} возвращена в руку благодаря эффекту.";
 			}
 		}
+
+		// Reset modifier AFTER all effects are applied
+		session.CurrentModifier = CreatureModifier.None;
 
 		if (session.IsRiverVisionRevealed)
 		{

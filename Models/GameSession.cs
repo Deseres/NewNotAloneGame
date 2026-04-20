@@ -60,8 +60,8 @@ public class GameSession
     public CreatureModifier CurrentModifier { get; set; } = CreatureModifier.None;
 
     // Winning thresholds
-    public const int MaxPlayerProgress = 13;
-    public const int MaxCreatureProgress = 7;
+    public const int MaxPlayerProgress = 7;
+    public const int MaxCreatureProgress = 5;
 
     public const int MaxWillpower = 3;
 }
