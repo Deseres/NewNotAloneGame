@@ -1,10 +1,11 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using NotAlone.Models;
+using NotAlone.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using BC = BCrypt.Net.BCrypt;
 
 namespace NotAlone.Controllers
 {
@@ -12,17 +13,14 @@ namespace NotAlone.Controllers
     [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
-        private readonly UserManager<User> _userManager;
-        private readonly SignInManager<User> _signInManager;
+        private readonly AppDbContext _dbContext;
         private readonly IConfiguration _configuration;
 
         public AuthController(
-            UserManager<User> userManager,
-            SignInManager<User> signInManager,
+            AppDbContext dbContext,
             IConfiguration configuration)
         {
-            _userManager = userManager;
-            _signInManager = signInManager;
+            _dbContext = dbContext;
             _configuration = configuration;
         }
 
@@ -41,24 +39,26 @@ namespace NotAlone.Controllers
             if (request.Password.Length < 6)
                 return BadRequest(new { message = "Password must be at least 6 characters" });
 
-            // Check if user already exists
-            var existingUser = await _userManager.FindByEmailAsync(request.Email);
+            // Check if email already exists
+            var existingUser = _dbContext.Users.FirstOrDefault(u => u.Email == request.Email);
             if (existingUser != null)
                 return BadRequest(new { message = "Email already registered" });
+
+            // Generate unique username
+            var username = request.Email.Split('@')[0] + Guid.NewGuid().ToString().Substring(0, 4);
 
             // Create new user
             var user = new User
             {
-                UserName = request.Email.Split('@')[0] + Guid.NewGuid().ToString().Substring(0, 4),
+                Id = Guid.NewGuid(),
+                Username = username,
                 Email = request.Email,
-                DisplayName = request.DisplayName ?? "Player",
-                EmailConfirmed = true
+                PasswordHash = BC.HashPassword(request.Password),
+                CreatedAt = DateTime.UtcNow
             };
 
-            var result = await _userManager.CreateAsync(user, request.Password);
-
-            if (!result.Succeeded)
-                return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
 
             var token = GenerateJwtToken(user);
 
@@ -66,8 +66,7 @@ namespace NotAlone.Controllers
             {
                 UserId = user.Id.ToString(),
                 Email = user.Email,
-                Username = user.UserName,
-                DisplayName = user.DisplayName,
+                Username = user.Username,
                 Token = token
             });
         }
@@ -85,13 +84,12 @@ namespace NotAlone.Controllers
                 return BadRequest(new { message = "Email and password are required" });
 
             // Find user by email
-            var user = await _userManager.FindByEmailAsync(request.Email);
+            var user = _dbContext.Users.FirstOrDefault(u => u.Email == request.Email);
             if (user == null)
                 return Unauthorized(new { message = "Invalid email or password" });
 
             // Verify password
-            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
-            if (!result.Succeeded)
+            if (!BC.Verify(request.Password, user.PasswordHash))
                 return Unauthorized(new { message = "Invalid email or password" });
 
             var token = GenerateJwtToken(user);
@@ -100,8 +98,7 @@ namespace NotAlone.Controllers
             {
                 UserId = user.Id.ToString(),
                 Email = user.Email,
-                Username = user.UserName,
-                DisplayName = user.DisplayName,
+                Username = user.Username,
                 Token = token
             });
         }
@@ -119,9 +116,8 @@ namespace NotAlone.Controllers
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
-                new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
-                new Claim("DisplayName", user.DisplayName ?? string.Empty)
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Name, user.Username)
             };
 
             var token = new JwtSecurityToken(
@@ -142,7 +138,6 @@ namespace NotAlone.Controllers
     {
         public string Email { get; set; } = "";
         public string Password { get; set; } = "";
-        public string? DisplayName { get; set; }
     }
 
     /// <summary>
@@ -162,7 +157,6 @@ namespace NotAlone.Controllers
         public string UserId { get; set; } = "";
         public string Email { get; set; } = "";
         public string Username { get; set; } = "";
-        public string DisplayName { get; set; } = "";
         public string Token { get; set; } = "";
     }
 }

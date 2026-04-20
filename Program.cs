@@ -1,7 +1,6 @@
 using NotAlone.Services;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -13,12 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Configure Identity
-builder.Services.AddIdentityCore<User>()
-    .AddEntityFrameworkStores<AppDbContext>()
-    .AddSignInManager();
-
-// 3. Configure JWT Authentication
+// 2. Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
 var secretKey = jwtSettings["SecretKey"];
 var key = Encoding.ASCII.GetBytes(secretKey ?? throw new InvalidOperationException("JWT SecretKey not configured"));
@@ -43,7 +37,7 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-// 4. Add controllers
+// 3. Add controllers
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -54,7 +48,7 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// 5. Register game services
+// 4. Register game services
 builder.Services.AddScoped<GameStore>();
 builder.Services.AddScoped<GameEngine>();
 builder.Services.AddScoped<CreatureLogic>();
@@ -63,29 +57,14 @@ builder.Services.AddScoped<TradeService>();
 
 var app = builder.Build();
 
-// 6. Apply migrations and seed data on startup
+// 5. Apply migrations on startup
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await dbContext.Database.MigrateAsync();
-
-    // Seed demo user if it doesn't exist
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
-    var demoUser = await userManager.FindByEmailAsync("demo@notalone.com");
-    if (demoUser == null)
-    {
-        var newUser = new User
-        {
-            UserName = "demo",
-            Email = "demo@notalone.com",
-            DisplayName = "Demo Player",
-            EmailConfirmed = true
-        };
-        await userManager.CreateAsync(newUser, "Demo123!");
-    }
 }
 
-// 7. Configure middleware pipeline
+// 6. Configure middleware pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

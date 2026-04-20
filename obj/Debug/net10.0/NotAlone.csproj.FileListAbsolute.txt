@@ -121,7 +121,6 @@ C:\NewNotAloneGame\bin\Debug\net10.0\Azure.Identity.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Humanizer.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\IdentityModel.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
-C:\NewNotAloneGame\bin\Debug\net10.0\Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Microsoft.Bcl.AsyncInterfaces.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Microsoft.Bcl.Cryptography.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Microsoft.Build.dll
@@ -253,3 +252,4 @@ C:\NewNotAloneGame\bin\Debug\net10.0\runtimes\win-arm64\native\Microsoft.Data.Sq
 C:\NewNotAloneGame\bin\Debug\net10.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\runtimes\win-x86\native\Microsoft.Data.SqlClient.SNI.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\runtimes\win\lib\net9.0\System.Windows.Extensions.dll
+C:\NewNotAloneGame\bin\Debug\net10.0\BCrypt.Net-Next.dll

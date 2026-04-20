@@ -19,6 +19,12 @@ public enum CreatureModifier
 public class GameSession
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    
+    /// <summary>
+    /// When this game session was started
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
     public int PlayerWillpower { get; set; } = 3;
     public int PlayerProgress { get; set; } = 0;
     public int CreatureProgress { get; set; } = 0;
