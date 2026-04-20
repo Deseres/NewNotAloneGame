@@ -7,11 +7,13 @@ public class GameEngine
 {
 	private readonly TradeService _tradeService;
 	private readonly CreatureLogic? _creatureLogic;
+	private readonly AppDbContext? _dbContext;
 
-	public GameEngine(TradeService? tradeService = null, CreatureLogic? creatureLogic = null)
+	public GameEngine(TradeService? tradeService = null, CreatureLogic? creatureLogic = null, AppDbContext? dbContext = null)
 	{
 		_tradeService = tradeService ?? new TradeService();
 		_creatureLogic = creatureLogic;
+		_dbContext = dbContext;
 	}
 
 	// Helper: apply Jungle effect (find random used location excluding currentCardId,
@@ -503,5 +505,32 @@ public class GameEngine
 			session.IsArtefactActive = false;
 			session.StatusMessage += " Артефакт использован и деактивирован.";
 		}
+	}
+
+	/// <summary>
+	/// Save game history to database when game ends
+	/// </summary>
+	public async Task SaveGameHistoryAsync(GameSession session, Guid userId)
+	{
+		if (_dbContext == null || !session.IsGameOver)
+			return;
+
+		var isPlayerWon = session.PlayerProgress >= GameSession.MaxPlayerProgress;
+		var result = isPlayerWon ? "Win" : "Loss";
+
+		var gameHistory = new GameHistory
+		{
+			Id = Guid.NewGuid(),
+			UserId = userId,
+			CompletedAt = DateTime.UtcNow,
+			RoundsPlayed = session.RoundNumber,
+			PlayerProgress = session.PlayerProgress,
+			CreatureProgress = session.CreatureProgress,
+			Result = result,
+			DurationSeconds = 0 // You can track this if you store StartTime in GameSession
+		};
+
+		_dbContext.GameHistories.Add(gameHistory);
+		await _dbContext.SaveChangesAsync();
 	}
 }

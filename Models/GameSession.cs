@@ -48,6 +48,9 @@ public class GameSession
     // All possible locations
     public int[] Locations { get; } = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
+    // Track number of rounds played
+    public int RoundNumber { get; set; } = 0;
+
     // Player's available and used locations
     public List<int> AvailableLocations { get; set; } = new List<int> { 1, 2, 3, 4, 5 };
     public List<int> UsedLocations { get; set; } = new List<int>();

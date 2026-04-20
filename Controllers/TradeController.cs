@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NotAlone.Models;
 using NotAlone.Services;
@@ -7,6 +8,7 @@ namespace NotAlone.Controllers;
 
 [ApiController]
 [Route("api/game")]
+[Authorize]
 public class TradeController : ControllerBase
 {
     private readonly GameStore _store;
