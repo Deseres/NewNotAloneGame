@@ -1,0 +1,118 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Frontend build
+/frontend/build
+/frontend/dist
+/frontend/.cache
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.vs/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+
+# .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.userprefs
+*.sln.user
+*.suo
+*.ncb
+*.aps
+*.vcproj
+*.vcxproj.user
+*.vcxproj.filters
+*.csproj.user
+*.resx
+*.resources
+*.cache
+*.ilk
+*.pdb
+*.exe
+*.dll
+*.lib
+*.a
+*.la
+*.so
+*.dylib
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+nuget.config
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.trx
+
+# Rider
+.idea/
+*.sln.iml
+*.sln.DotSettings.user
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS-specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ESLint
+.eslintcache
+
+# Testing
+/coverage
+/.nyc_output
+
+# Misc
+.env.*.local
+!.env.example
+*.pem
