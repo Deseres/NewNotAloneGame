@@ -23,21 +23,23 @@ public class GameController : ControllerBase
     }
 
     [HttpPost("start")]
-    public ActionResult<GameSession> StartGame()
+    public async Task<ActionResult<GameSession>> StartGame()
     {
         var session = new GameSession();
         // Give player one random survival card (IDs 1-5)
         int randomCard = Random.Shared.Next(1, 6);
         session.AvailableSurvivalCards = new List<int> { randomCard };
         session.StatusMessage = "🎮 Игра началась! Выживание маловероятно. Выберите локацию для начала.";
+        await _store.CreateSessionAsync(session);
         _store.Sessions[session.Id] = session;
         return Ok(new { message = session.StatusMessage, session = session });
     }
 
     [HttpPost("{id}/play")]
-    public ActionResult<GameSession> PlayRound(Guid id, [FromBody] int playerLocation)
+    public async Task<ActionResult<GameSession>> PlayRound(Guid id, [FromBody] int playerLocation)
     {
-        if (!_store.Sessions.TryGetValue(id, out var session))
+        var session = await _store.GetSessionAsync(id);
+        if (session == null)
             return NotFound(new { error = "❌ Игровая сессия не найдена." });
 
         if (session.IsGameOver)
@@ -51,13 +53,15 @@ public class GameController : ControllerBase
         // move to CreatureTurn phase
         session.CurrentPhase = GamePhase.CreatureTurn;
 
+        await _store.UpdateSessionAsync(session);
         return Ok(new { message = session.StatusMessage, session = session });
     }
 
     [HttpPost("{id}/creature-turn")]
-    public ActionResult<GameSession> CreatureTurn(Guid id)
+    public async Task<ActionResult<GameSession>> CreatureTurn(Guid id)
     {
-        if (!_store.Sessions.TryGetValue(id, out var session))
+        var session = await _store.GetSessionAsync(id);
+        if (session == null)
             return NotFound(new { error = "❌ Игровая сессия не найдена." });
 
         if (session.IsGameOver)
@@ -71,13 +75,15 @@ public class GameController : ControllerBase
         // move to Result phase
         session.CurrentPhase = GamePhase.Result;
 
+        await _store.UpdateSessionAsync(session);
         return Ok(new { message = session.StatusMessage, session = session });
     }
 
     [HttpPost("{id}/next-round")]
-    public ActionResult<GameSession> NextRound(Guid id)
+    public async Task<ActionResult<GameSession>> NextRound(Guid id)
     {
-        if (!_store.Sessions.TryGetValue(id, out var session))
+        var session = await _store.GetSessionAsync(id);
+        if (session == null)
             return NotFound(new { error = "❌ Игровая сессия не найдена." });
 
         if (session.IsGameOver)
@@ -90,7 +96,18 @@ public class GameController : ControllerBase
         _engine.ResolveRound(session);
 
         if (session.IsGameOver)
+        {
+            await _store.UpdateSessionAsync(session);
+            
+            // Get user ID from claims and save game history
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(userIdClaim, out var userId))
+            {
+                await _engine.SaveGameHistoryAsync(session, userId);
+            }
+            
             return Ok(new { message = session.StatusMessage, session = session });
+        }
 
         // If game continues, move to next Selection phase
         session.CurrentPhase = GamePhase.Selection;
@@ -105,11 +122,13 @@ public class GameController : ControllerBase
                 session.LastCreatureChoice = preChoice;
                 session.IsRiverVisionRevealed = true;
                 session.StatusMessage = $"[NextRound] 👁️ Видение реки активно: Существо пойдёт на локацию {preChoice}. Выберите вашу локацию.";
+                await _store.UpdateSessionAsync(session);
                 return Ok(new { message = session.StatusMessage, session = session });
             }
         }
 
         session.StatusMessage = "[NextRound] ▶️ Новый раунд начался. Выберите вашу локацию.";
+        await _store.UpdateSessionAsync(session);
         return Ok(new { message = session.StatusMessage, session = session });
     }
 }

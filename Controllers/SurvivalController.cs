@@ -20,9 +20,10 @@ public class SurvivalController : ControllerBase
     }
 
     [HttpPost("{id}/cards/play/{cardId}")]
-    public IActionResult PlayCard(Guid id, int cardId, [FromBody] PlayCardRequest? request)
+    public async Task<IActionResult> PlayCard(Guid id, int cardId, [FromBody] PlayCardRequest? request)
     {
-        if (!_gameStore.Sessions.TryGetValue(id, out var session))
+        var session = await _gameStore.GetSessionAsync(id);
+        if (session == null)
             return NotFound(new { error = "❌ Игровая сессия не найдена." });
 
         if (!session.AvailableSurvivalCards.Contains(cardId))
@@ -77,6 +78,8 @@ public class SurvivalController : ControllerBase
         // Remove from hand and move to used
         session.AvailableSurvivalCards.Remove(cardId);
         session.UsedSurvivalCards.Add(cardId);
+
+        await _gameStore.UpdateSessionAsync(session);
 
         return Ok(new 
         { 

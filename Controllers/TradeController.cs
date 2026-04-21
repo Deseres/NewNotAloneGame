@@ -21,9 +21,10 @@ public class TradeController : ControllerBase
     }
 
     [HttpPost("{id}/resist")]
-    public ActionResult<GameSession> Resist(Guid id, [FromBody] ResistRequest request)
+    public async Task<ActionResult<GameSession>> Resist(Guid id, [FromBody] ResistRequest request)
     {
-        if (!_store.Sessions.TryGetValue(id, out var session))
+        var session = await _store.GetSessionAsync(id);
+        if (session == null)
             return NotFound("Game session not found.");
 
         if (session.IsGameOver)
@@ -42,6 +43,7 @@ public class TradeController : ControllerBase
         if (request.GivenWillpower == 3)
         {
             _tradeService.GiveUp(session);
+            await _store.UpdateSessionAsync(session);
             return Ok(session);
         }
 
@@ -59,13 +61,15 @@ public class TradeController : ControllerBase
         }
 
         _tradeService.Resist(session, request.GivenWillpower, request.ChosenLocations);
+        await _store.UpdateSessionAsync(session);
         return Ok(session);
     }
 
     [HttpPost("{id}/giveup")]
-    public ActionResult<GameSession> GiveUp(Guid id)
+    public async Task<ActionResult<GameSession>> GiveUp(Guid id)
     {
-        if (!_store.Sessions.TryGetValue(id, out var session))
+        var session = await _store.GetSessionAsync(id);
+        if (session == null)
             return NotFound("Game session not found.");
 
         if (session.IsGameOver)
@@ -75,6 +79,7 @@ public class TradeController : ControllerBase
             return BadRequest("This action is only allowed in Selection phase.");
 
         _tradeService.GiveUp(session);
+        await _store.UpdateSessionAsync(session);
         return Ok(session);
     }
 }

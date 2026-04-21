@@ -1,6 +1,5 @@
 C:\NewNotAloneGame\bin\Debug\net10.0\NotAlone.exe
 C:\NewNotAloneGame\bin\Debug\net10.0\NotAlone.dll
-C:\NewNotAloneGame\bin\Debug\net10.0\Microsoft.AspNetCore.OpenApi.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Microsoft.OpenApi.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
 C:\NewNotAloneGame\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
