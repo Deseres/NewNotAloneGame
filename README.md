@@ -1,26 +1,20 @@
 # NotAlone - Full Stack Survival Game
 
-A strategic location-based survival game with creature AI mechanics. Backend is built with .NET 10 Web API, frontend with React.
+A strategic location-based survival game with creature AI mechanics. Backend is built with .NET 10 Web API.
 
 ---
 
 ## 🎮 Quick Start for Frontend Developers
 
 ### Prerequisites
-- Node.js 18+ and npm
 - Backend running on `http://localhost:5000`
+- Any frontend framework (React, Vue, Angular, Svelte, vanilla JS, etc.)
 
-### Setup
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm start
-```
-
-The app will open at `http://localhost:3000`
+### Development Requirements
+Your frontend framework/technology of choice should support:
+- HTTP requests (to communicate with REST API)
+- Local storage (for JWT token persistence)
+- CORS handling for `http://localhost:5000`
 
 ---
 
@@ -117,120 +111,72 @@ Content-Type: application/json
 
 ## 🛠️ Frontend Integration Guide
 
-### Setting Up API Client
+### API Client Setup
 
-Create `src/api/apiClient.js`:
+Your frontend needs to:
 
+1. **Make HTTP requests** to `http://localhost:5000/api`
+2. **Store JWT token** in localStorage after login
+3. **Include token** in `Authorization: Bearer {token}` header for protected endpoints
+4. **Handle 401 responses** by clearing token and redirecting to login
+
+Example with vanilla JavaScript fetch:
 ```javascript
-import axios from 'axios';
-
 const API_BASE_URL = 'http://localhost:5000/api';
 
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-// Add JWT token to all requests
-apiClient.interceptors.request.use((config) => {
+const apiRequest = async (endpoint, method = 'GET', body = null) => {
   const token = localStorage.getItem('authToken');
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+  
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    headers['Authorization'] = `Bearer ${token}`;
   }
-  return config;
-});
-
-// Handle 401 errors (token expired)
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
+  
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : null,
+  });
+  
+  if (response.status === 401) {
+    localStorage.removeItem('authToken');
+    window.location.href = '/login';
   }
-);
-
-export default apiClient;
+  
+  return response.json();
+};
 ```
 
-### Service Layer Structure
+### Service Organization
 
-Create service files in `src/services/`:
+Organize API calls by feature:
+- **Auth** - Register, login, profile
+- **Game** - Game sessions, rounds, game lifecycle
+- **Survival** - Cards, card playing, survival status
+- **Trade** - Trading (future implementation)
 
-- **authService.js** - Register, login, profile
-- **gameService.js** - Game sessions, rounds, game lifecycle
-- **survivalService.js** - Cards, card playing, survival status
-- **tradeService.js** - Trading (future implementation)
+### Views/Pages to Implement
 
-Example `gameService.js`:
-```javascript
-import apiClient from '../api/apiClient';
+1. **Login & Register** - User authentication
+2. **Game Board** - Main gameplay interface
+3. **Survival Cards** - Card display and playing
+4. **Game History** - Completed games list
+5. **User Profile** - User management
 
-export const startGame = () =>
-  apiClient.post('/game/start');
+### Core Features Checklist
 
-export const getGame = (gameId) =>
-  apiClient.get(`/game/${gameId}`);
-
-export const playRound = (gameId, locationId) =>
-  apiClient.post(`/game/${gameId}/play`, { locationId });
-
-export const nextRound = (gameId) =>
-  apiClient.post(`/game/${gameId}/next-round`);
-
-export const endGame = (gameId) =>
-  apiClient.post(`/game/${gameId}/end`);
-```
-
-### Pages to Implement
-
-1. **AuthPages** (`/login`, `/register`)
-   - Handle user authentication
-   - Store JWT token in localStorage
-   - Redirect to game on success
-
-2. **GamePage** (`/game/:id`)
-   - Display game session state
-   - Show available locations
-   - Allow location selection in Selection phase
-
-3. **SurvivalPage**
-   - Display player's survival cards
-   - Show card effects and requirements
-   - Allow card playing with proper validation
-
-4. **GameHistoryPage**
-   - List completed games
-   - Show game results and statistics
-
-### Core Features to Implement
-
-✅ **Authentication**
-- Login/Register forms
-- JWT token management
-- Protected routes
-
-✅ **Game Dashboard**
-- Current game status
-- Round counter
-- Willpower/location display
-- Game history
-
-✅ **Game Board**
-- 5-6 location buttons (player selection)
-- Creature location (revealed in Result phase)
-- Visual feedback for matches/mismatches
-
-✅ **Survival Cards UI**
-- Card hand display
-- Card selection/playing
-- Modal for card details and target selection
-
-✅ **Game Flow**
-- Selection phase UI
-- Result phase with animations
-- Game over screen with statistics
+- [ ] User registration and login
+- [ ] JWT token storage and management
+- [ ] Protected routes/pages
+- [ ] Game session creation
+- [ ] Location selection (5-6 locations)
+- [ ] Creature location reveal (Result phase)
+- [ ] Survival card display and playing
+- [ ] Will power/locations status display
+- [ ] Game over screen with results
+- [ ] Game history view
 
 ---
 
@@ -238,21 +184,11 @@ export const endGame = (gameId) =>
 
 ```
 1. User fills login form
-2. POST /api/auth/login
+2. POST /api/auth/login with email and password
 3. Backend returns JWT token
 4. Store token in localStorage
-5. Include "Authorization: Bearer TOKEN" in all requests
-6. If 401 response → clear token & redirect to login
-```
-
-**Frontend code:**
-```javascript
-const handleLogin = async (email, password) => {
-  const response = await apiClient.post('/auth/login', { email, password });
-  localStorage.setItem('authToken', response.data.token);
-  setUser(response.data.user);
-  navigate('/game');
-};
+5. Include "Authorization: Bearer TOKEN" header in all future requests
+6. If 401 response → clear token and redirect to login
 ```
 
 ---
@@ -341,9 +277,10 @@ Database is automatically migrated on backend startup.
 
 ## 📚 Useful Resources
 
-- [React Documentation](https://react.dev)
-- [Axios Documentation](https://axios-http.com)
 - [JWT Explained](https://jwt.io/introduction)
+- [REST API Best Practices](https://restfulapi.net/)
+- [CORS Explained](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
+- [HTTP Status Codes](https://httpwg.org/specs/rfc9110.html#status.codes)
 - [ASP.NET Core API](https://learn.microsoft.com/aspnet/core)
 
 ---
