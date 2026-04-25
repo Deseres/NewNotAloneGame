@@ -1,41 +1,50 @@
-# Logs
-logs
+## Logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+pnpm-debug.log*
 
-# Dependencies
+## Dependencies
 node_modules/
 /.pnp
 .pnp.js
+package-lock.json
 
-# Frontend build
-/frontend/build
-/frontend/dist
-/frontend/.cache
+## Node.js / Frontend
+/frontend/node_modules/
+/frontend/build/
+/frontend/dist/
+/frontend/.cache/
+/frontend/coverage/
+/frontend/.nyc_output/
+/frontend/.eslintcache
 
-# Environment variables
+## Environment Variables
 .env
 .env.local
 .env.*.local
-.env.development.local
-.env.test.local
-.env.production.local
+!.env.example
 
-# IDE
+## IDE & Editor
 .vscode/
 .vs/
 .idea/
+*.sublime-project
+*.sublime-workspace
 *.swp
 *.swo
 *~
-*.sublime-project
-*.sublime-workspace
-.DS_Store
+*.code-workspace
 
-# .NET / Visual Studio
+## OS-Specific
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## .NET / Visual Studio / C#
 bin/
 obj/
 .vs/
@@ -45,15 +54,30 @@ obj/
 *.suo
 *.ncb
 *.aps
-*.vcproj
 *.vcxproj.user
 *.vcxproj.filters
 *.csproj.user
+*.csproj.DotSettings.user
 *.resx
-*.resources
 *.cache
 *.ilk
 *.pdb
+
+## Build Output
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+[Ll]og/
+[Ll]ogs/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+
+## Binaries & Libraries
 *.exe
 *.dll
 *.lib
@@ -62,57 +86,48 @@ obj/
 *.so
 *.dylib
 
-# Build results
-[Dd]ebug/
-[Dd]ebugPublic/
-[Rr]elease/
-[Rr]eleases/
-x64/
-x86/
-[Ww][Ii][Nn]32/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
-bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
-
-# NuGet
+## NuGet
 *.nupkg
 *.snupkg
 .nuget/
-nuget.config
 
-# Test results
+## Test Results
 TestResults/
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
 *.trx
+/coverage/
 
-# Rider
-.idea/
+## JetBrains/Rider
 *.sln.iml
 *.sln.DotSettings.user
+.idea/
 
-# Local database files
+## Databases
 *.db
 *.sqlite
 *.sqlite3
 
-# OS-specific
-.DS_Store
-Thumbs.db
-Desktop.ini
-
-# ESLint
-.eslintcache
-
-# Testing
-/coverage
-/.nyc_output
-
-# Misc
-.env.*.local
-!.env.example
+## Certificates & Security
 *.pem
+*.pfx
+*.p12
+
+## macOS
+.AppleDouble
+.LSOverride
+._*
+
+## Temporary Files
+*.tmp
+*.temp
+.#*
+
+## Distribution / Deployment
+/dist/
+/build/
+
+## Package Management
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
