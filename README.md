@@ -4,196 +4,126 @@ A strategic location-based survival game with creature AI mechanics. Backend is 
 
 ---
 
-## 🎮 Quick Start for Frontend Developers
+## Quick Start
 
 ### Prerequisites
-- Backend running on `http://localhost:5000`
-- Any frontend framework (React, Vue, Angular, Svelte, vanilla JS, etc.)
+- Frontend framework/library of choice
+- API is live at: https://notalone-api-bjbza7e9gafjfrfv.swedencentral-01.azurewebsites.net
 
-### Development Requirements
-Your frontend framework/technology of choice should support:
-- HTTP requests (to communicate with REST API)
-- Local storage (for JWT token persistence)
-- CORS handling for `http://localhost:5000`
+### Development
+```bash
+# API Base URL
+https://notalone-api-bjbza7e9gafjfrfv.swedencentral-01.azurewebsites.net/api
+
+# Swagger UI
+https://notalone-api-bjbza7e9gafjfrfv.swedencentral-01.azurewebsites.net/swagger
+
+# CORS: Enabled for all origins
+```
 
 ---
 
-## 📋 Backend API Overview
-
-The backend runs on `http://localhost:5000` and provides the following endpoints:
+## Backend API Overview
 
 ### Authentication
-All game endpoints require JWT authentication (except `/api/auth/register` and `/api/auth/login`)
-
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/auth/register` | Register new user |
 | POST | `/api/auth/login` | Login and get JWT token |
-| GET | `/api/auth/profile` | Get user profile |
-| PUT | `/api/auth/profile` | Update user profile |
 
 **Example Login:**
 ```bash
-POST http://localhost:5000/api/auth/login
+POST https://notalone-api-bjbza7e9gafjfrfv.swedencentral-01.azurewebsites.net/api/auth/login
 Content-Type: application/json
 
 {
   "email": "player1@example.com",
-  "password": "Password123"
+  "password": "Password123!"
 }
 ```
+
+**Password Requirements:**
+- Minimum 8 characters
+- Must contain at least one special character (!@#$%^&*)
 
 **Response:**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "email": "player1@example.com"
-  }
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "player1@example.com",
+  "username": "player1_abc1",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
 ### Game Management
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| POST | `/api/game/start` | Start a new game session | ✓ |
-| GET | `/api/game/{id}` | Get game session details | ✓ |
-| POST | `/api/game/{id}/play` | Play a round (choose location) | ✓ |
-| POST | `/api/game/{id}/next-round` | Move to next round | ✓ |
-| POST | `/api/game/{id}/end` | End game session | ✓ |
+| POST | `/api/game/start` | Start a new game session | Required |
+| POST | `/api/game/{id}/play` | Play a round (choose location) | Required |
+| POST | `/api/game/{id}/next-round` | Move to next round | Required |
 
 ### Survival Cards
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| GET | `/api/survival/cards` | Get all available cards | ✓ |
-| POST | `/api/survival/cards/play/{cardId}` | Play a card | ✓ |
-| GET | `/api/survival/status/{sessionId}` | Get survival status | ✓ |
+| POST | `/api/game/{id}/cards/play/{cardId}` | Play a card | Required |
 
-**Play Card with Parameters:**
-```bash
-POST http://localhost:5000/api/survival/cards/play/3
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
-
-{
-  "targetLocationIds": [2, 4]
-}
-```
-
-### Will Power & Trading
+### Willpower & Surrender
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| POST | `/api/game/{id}/resist` | Spend willpower to restore locations | ✓ |
-| POST | `/api/game/{id}/giveup` | Give up (boost creature progress) | ✓ |
+| POST | `/api/game/{id}/resist` | Spend willpower to restore locations | Required |
+| POST | `/api/game/{id}/giveup` | Give up (boost creature progress) | Required |
 
 ---
 
-## 🎴 Card System
+## Locations (1-10)
 
-### Available Cards
+The game features 10 strategic locations with unique mechanics:
 
-| ID | Name | Type | Phase | Effect |
-|----|------|------|-------|--------|
-| 1 | Heal | Heal | Selection | Restore +1 willpower (max 3) |
-| 2 | Beacon | Beacon | Selection | Light the beacon |
-| 3 | Regenerate 2 Locations | LocationsRegen | Selection | Restore 2 used locations |
-| 4 | Move Target | MoveTarget | Result | Change creature location |
-| 5 | Fog | Fog | Selection | Hide location from creature |
+| # | Location | Effect | Safety | Strategic Use |
+|---|----------|--------|--------|----------------|
+| 1 | **Lair** | If you escape: copies creature's location effect. If caught: lose extra willpower (2 total) | 0/100 | High risk, high reward - study creature strategy |
+| 2 | **Jungle** | If you escape: restore one random used location | 40/100 | Mid-game recovery for locations |
+| 3 | **River** | If you escape: enables River Vision (see creature's next move) | 45/100 | Powerful intel for next round prediction |
+| 4 | **Beach** | If you escape with beacon lit: gain +1 progress. Can extinguish creature's beacon | 35/100 | Beacon manipulation - key tactical location |
+| 5 | **Rover** | If you escape: unlock one randomly blocked location | 50/100 | Expand options when trapped |
+| 6 | **Swamp** | If you escape: preserved in hand (can reuse next round) | 48/100 | Strategic recycling for survival cards |
+| 7 | **Shelter** | If you escape: preserved in hand (can reuse next round) | 52/100 | Safe card regeneration |
+| 8 | **Wreck** | If you escape: gain +1 progress toward victory | 38/100 | High-value escape location |
+| 9 | **Source** | If you escape: restore +1 willpower (max 3) | 55/100 | Healing location - creature hunts here |
+| 10 | **Artefact** | If you escape: disable creature's next modifier | 60/100 | Neutralizes creature power - safest location |
 
-### Card Phase System
+**Location Mechanics:**
+- **Available Locations**: Start with 5 of the first 5 locations
+- **Used Locations**: Locations you've chosen become "used" temporarily
+- **Blocked Locations**: Locations 6-10 start blocked (must unlock via Rover)
+- **Recycled Cards**: Swamp & Shelter preserve cards for next round
+- **Escape vs Caught**: Effects only trigger if you escape; being caught prevents location effects
 
-- **Selection Phase**: Player chooses a location and plays cards while creature location is unknown
-- **Result Phase**: Locations are revealed, cards trigger effects, game logic resolves
-- **GameOver**: Game ends with victory or defeat
-
----
-
-## 🛠️ Frontend Integration Guide
-
-### API Client Setup
-
-Your frontend needs to:
-
-1. **Make HTTP requests** to `http://localhost:5000/api`
-2. **Store JWT token** in localStorage after login
-3. **Include token** in `Authorization: Bearer {token}` header for protected endpoints
-4. **Handle 401 responses** by clearing token and redirecting to login
-
-Example with vanilla JavaScript fetch:
-```javascript
-const API_BASE_URL = 'http://localhost:5000/api';
-
-const apiRequest = async (endpoint, method = 'GET', body = null) => {
-  const token = localStorage.getItem('authToken');
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : null,
-  });
-  
-  if (response.status === 401) {
-    localStorage.removeItem('authToken');
-    window.location.href = '/login';
-  }
-  
-  return response.json();
-};
-```
-
-### Service Organization
-
-Organize API calls by feature:
-- **Auth** - Register, login, profile
-- **Game** - Game sessions, rounds, game lifecycle
-- **Survival** - Cards, card playing, survival status
-- **Trade** - Trading (future implementation)
-
-### Views/Pages to Implement
-
-1. **Login & Register** - User authentication
-2. **Game Board** - Main gameplay interface
-3. **Survival Cards** - Card display and playing
-4. **Game History** - Completed games list
-5. **User Profile** - User management
-
-### Core Features Checklist
-
-- [ ] User registration and login
-- [ ] JWT token storage and management
-- [ ] Protected routes/pages
-- [ ] Game session creation
-- [ ] Location selection (5-6 locations)
-- [ ] Creature location reveal (Result phase)
-- [ ] Survival card display and playing
-- [ ] Will power/locations status display
-- [ ] Game over screen with results
-- [ ] Game history view
+**Creature Modifiers:**
+Each round the creature applies a random modifier affecting the outcome:
+- **DoubleDamage**: Creature gains +2 progress instead of +1 when catching
+- **BlockPlayerProgress**: Your escape doesn't grant progress
+- **LoseRandomLocation**: You lose one random available location
+- **BeachAndWreckBlock**: Beach & Wreck effects disabled
+- **ExtraCreatureProgress**: Creature gains +2 progress (but you can still gain progress on escape)
 
 ---
 
-## 🔄 Authentication Flow
+## Authentication Flow
 
 ```
-1. User fills login form
-2. POST /api/auth/login with email and password
-3. Backend returns JWT token
-4. Store token in localStorage
+1. User submits login form with email and password
+2. POST /api/auth/login
+3. Backend returns JWT token (valid 60 minutes)
+4. Store token in localStorage or secure storage
 5. Include "Authorization: Bearer TOKEN" header in all future requests
-6. If 401 response → clear token and redirect to login
+6. If 401 response -> clear token and redirect to login
 ```
 
 ---
 
-## 🎮 Game Flow
+## Game Flow
 
 ```
 1. User starts game (POST /api/game/start)
@@ -203,294 +133,37 @@ Organize API calls by feature:
    - POST /api/game/{id}/play with location
 3. Result Phase:
    - Creature location revealed
-   - Cards resolve
+   - Cards resolve effects
    - POST /api/game/{id}/next-round
 4. Repeat until game over
-5. POST /api/game/{id}/end to finish
 ```
 
 ---
 
-## 📊 Data Models
-
-### Game Session
-```json
-{
-  "id": "uuid",
-  "userId": "uuid",
-  "roundNumber": 1,
-  "playerWillpower": 3,
-  "creatureProgress": 0,
-  "phase": "Selection|Result|GameOver",
-  "selectedLocationId": 1,
-  "creatureLocationId": 2,
-  "usedLocations": [1, 3],
-  "availableLocations": [2, 4, 5, 6],
-  "createdAt": "2026-04-25T..."
-}
-```
-
-### User
-```json
-{
-  "id": "uuid",
-  "email": "player@example.com",
-  "passwordHash": "hashed_password",
-  "createdAt": "2026-04-25T..."
-}
-```
-
-### Survival Card
-```json
-{
-  "id": 1,
-  "name": "Heal",
-  "type": "Heal|Beacon|LocationsRegen|MoveTarget|Fog",
-  "phase": "Selection|Result",
-  "description": "Restore +1 willpower (max 3)"
-}
-```
-
-### Game History
-```json
-{
-  "id": "uuid",
-  "userId": "uuid",
-  "gameSessionId": "uuid",
-  "outcome": "Victory|Defeat",
-  "finalRound": 10,
-  "finalWillpower": 2,
-  "completedAt": "2026-04-25T..."
-}
-```
-
----
-
-## 🏗️ Backend Architecture
+## Architecture
 
 ### Controllers
+- **AuthController** - User registration and login
+- **GameController** - Game session management (start, play, end)
+- **SurvivalController** - Card library and card playing
+- **TradeController** 
 
-#### AuthController
-- **POST /api/auth/register** - User registration
-- **POST /api/auth/login** - User authentication
-- **GET /api/auth/profile** - Get user profile
-- **PUT /api/auth/profile** - Update user profile
+### Core Services
+- **GameEngine** - Round processing and phase transitions
+- **GameStore** - In-memory game session storage
+- **CreatureLogic** - Creature AI decision making
+- **SurvivalService** - Card effects and willpower management
+- **AppDbContext** - Entity Framework Core database access
 
-#### GameController  
-- **POST /api/game/start** - Initialize new game session
-- **GET /api/game/{id}** - Retrieve game state
-- **POST /api/game/{id}/play** - Process location selection
-- **POST /api/game/{id}/next-round** - Advance to next round
-- **POST /api/game/{id}/end** - End game session
-- **POST /api/game/{id}/resist** - Spend willpower
-- **POST /api/game/{id}/giveup** - Surrender and reset
-
-#### SurvivalController
-- **GET /api/survival/cards** - Get card library
-- **POST /api/survival/cards/play/{cardId}** - Play specific card
-- **GET /api/survival/status/{sessionId}** - Get survival status
-
-#### TradeController
-- *Future implementation for trading system*
-
-### Services
-
-#### GameEngine
-- Core game logic and round processing
-- Phase transitions (Selection → Result)
-- Win/lose condition checking
-- Location availability tracking
-
-#### GameStore
-- In-memory storage for active game sessions (Singleton pattern)
-- Session retrieval and updates
-- Real-time game state management
-
-#### CreatureLogic
-- Creature AI decision making
-- Location selection algorithm
-- Progress tracking
-
-#### SurvivalService
-- Card effect resolution
-- Willpower management
-- Location regeneration logic
-
-#### AppDbContext
-- Entity Framework Core database context
-- User, GameSession, GameHistory, SurvivalCard entities
-- Database migrations
-- Connection to SQL Server
-
-### Models (Domain Entities)
-
-- **User** - User accounts and authentication
+### Models
+- **User** - User accounts
 - **GameSession** - Active game state
 - **GameHistory** - Completed game records
-- **SurvivalCard** - Card definitions and metadata
-- **SurvivalCardType** - Enum for card types
+- **SurvivalCard** - Card definitions
 
 ---
 
-## 🗄️ Database Schema
-
-The application uses 4 main tables:
-
-1. **Users** - User credentials and profiles
-2. **GameSessions** - Active games with current state
-3. **GameHistories** - Historical game records and outcomes
-4. **SurvivalCards** - Card library and definitions
-
-Database is automatically initialized with migrations on backend startup.
-
----
-
-## � JWT Configuration
-
-The backend uses JWT (JSON Web Tokens) for stateless authentication:
-
-**Token Claims:**
-- `sub` - Subject (User ID)
-- `email` - User email
-- `exp` - Expiration time (default: 60 minutes)
-- `iss` - Issuer: `NotAloneAPI`
-- `aud` - Audience: `NotAloneClient`
-
-**Secret Key:** Configured in `appsettings.json`
-```json
-{
-  "Jwt": {
-    "SecretKey": "YourSuperSecretKeyThatIsAtLeast32CharactersLongForHS256!",
-    "Issuer": "NotAloneAPI",
-    "Audience": "NotAloneClient",
-    "ExpirationMinutes": 60
-  }
-}
-```
-
-**Usage:**
-1. Frontend stores token in localStorage after login
-2. Include in all requests: `Authorization: Bearer {token}`
-3. Backend validates token signature and expiration
-4. Token refresh requires re-login (no refresh tokens currently)
-
----
-
-## 🎯 Dependency Injection (DI)
-
-Services registered in Program.cs:
-
-```csharp
-builder.Services.AddScoped<GameStore>();
-builder.Services.AddScoped<GameEngine>();
-builder.Services.AddScoped<CreatureLogic>();
-builder.Services.AddScoped<SurvivalService>();
-builder.Services.AddScoped<TradeService>();
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
-```
-
-**Scoped Services:** New instance per HTTP request
-**DbContext:** Manages database connections and transactions
-
----
-
-## 📂 Project Structure
-
-```
-NotAlone.csproj
-├── Controllers/
-│   ├── AuthController.cs
-│   ├── GameController.cs
-│   ├── SurvivalController.cs
-│   └── TradeController.cs
-├── Services/
-│   ├── AppDbContext.cs
-│   ├── GameEngine.cs
-│   ├── GameStore.cs
-│   ├── SurvivalService.cs
-│   ├── CreatureLogic.cs
-│   └── TradeService.cs
-├── Models/
-│   ├── User.cs
-│   ├── GameSession.cs
-│   ├── GameHistory.cs
-│   ├── SurvivalCard.cs
-│   ├── SurvivalCardType.cs
-│   ├── PlayCardRequest.cs
-│   └── ResistRequest.cs
-├── Migrations/
-│   └── [EF Core migration files]
-├── Program.cs
-├── README.md
-├── ARCHITECTURE.md
-└── NotAlone.csproj
-```
-
----
-
-## �🗄️ Database
-
-Uses **SQL Server** with Entity Framework Core.
-
-**Connection String:** `Server=localhost\SQLEXPRESS;Initial Catalog=NotAloneDb;`
-
-Database is automatically initialized with migrations on backend startup.
-
----
-
-## 🧪 Testing
-
-### Unit Tests
-Located in `NotAlone.Tests/`:
-- `GameEngineModifierTests.cs` - Game logic unit tests
-
-### Manual Testing
-1. **Swagger UI** - Test endpoints interactively
-   ```
-   http://localhost:5000/swagger
-   ```
-
-2. **HTTP Client** - Use NotAlone.http or Postman
-   - Pre-configured requests for all endpoints
-   - JWT token injection
-
-3. **Frontend Integration**
-   - Test authentication flow
-   - Verify game round progression
-   - Check card playing mechanics
-
----
-
-## 🔧 Build & Run
-
-### Prerequisites
-- .NET 10 SDK
-- SQL Server (LocalDB or Express Edition)
-- Visual Studio 2022 or VS Code
-
-### Build
-```bash
-dotnet build
-```
-
-### Run
-```bash
-dotnet run
-# or use the VS Code task
-# or run with: dotnet run --urls=http://localhost:5000
-```
-
-### Database
-```bash
-# Migrations run automatically on startup
-# Manual migration (if needed):
-# dotnet ef database update
-```
-
----
-
-## 📋 Configuration Files
+## Configuration
 
 ### appsettings.json
 ```json
@@ -499,103 +172,6 @@ dotnet run
     "DefaultConnection": "Server=localhost\\SQLEXPRESS;Initial Catalog=NotAloneDb;Integrated Security=true;Encrypt=false;"
   },
   "Jwt": {
-    "SecretKey": "...",
-    "Issuer": "NotAloneAPI",
-    "Audience": "NotAloneClient",
-    "ExpirationMinutes": 60
-  },
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information"
-    }
-  }
-}
-```
-
-### appsettings.Development.json
-- Local development overrides
-- Debug logging configuration
-
----
-
-## 🚀 Deployment Checklist
-
-- [ ] Update API_BASE_URL for production environment
-- [ ] Generate new JWT secret key (not the default)
-- [ ] Configure production SQL Server connection
-- [ ] Set up CORS for frontend domain
-- [ ] Enable HTTPS/SSL
-- [ ] Configure logging and monitoring
-- [ ] Implement proper error handling and user feedback
-- [ ] Add loading states for async operations
-- [ ] Test all authentication flows
-- [ ] Implement game state caching if needed
-- [ ] Add analytics/logging
-- [ ] Set up CI/CD pipeline
-- [ ] Database backups and disaster recovery
-
----
-
-## 📝 Development Tips
-
-1. **Testing API Endpoints**: Use Swagger UI at `http://localhost:5000/swagger`
-2. **Check Token**: Decode JWT at `jwt.io` to verify claims
-3. **Database Errors**: Check SQL Server is running and connection string is correct
-4. **CORS Issues**: Verify frontend is making requests to `http://localhost:5000`
-5. **Game Logic**: Review `GameEngine.cs` for round processing logic
-6. **Database Queries**: Use SQL Server Management Studio to inspect data
-7. **Performance**: Monitor GameStore for memory issues with many concurrent games
-8. **Card Effects**: Check `SurvivalService.cs` for card resolution logic
-
----
-
-## 📚 Useful Resources
-
-- [JWT Explained](https://jwt.io/introduction)
-- [REST API Best Practices](https://restfulapi.net/)
-- [CORS Explained](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)
-- [HTTP Status Codes](https://httpwg.org/specs/rfc9110.html#status.codes)
-- [ASP.NET Core API](https://learn.microsoft.com/aspnet/core)
-- [Entity Framework Core](https://learn.microsoft.com/ef/core/)
-- [JWT Bearer Authentication](https://learn.microsoft.com/aspnet/core/security/authentication/jwt-authn)
-
----
-
-## ⚙️ Backend Reference
-
-Backend requires:
-- .NET 10 SDK
-- SQL Server (LocalDB or Express)
-- Run: `dotnet run` from project root
-- Listens on: `http://localhost:5000`
-- Swagger available at: `http://localhost:5000/swagger`
-
-**Backend folder structure:**
-```
-Controllers/      - API endpoints (Auth, Game, Survival, Trade)
-Services/         - Business logic (GameEngine, SurvivalService, etc.)
-Models/           - Domain entities (User, GameSession, etc.)
-Migrations/       - EF Core database schema migrations
-Program.cs        - Startup configuration and DI setup
-```
-
----
-
-## � JWT Configuration
-
-The backend uses JWT (JSON Web Tokens) for stateless authentication:
-
-**Token Claims:**
-- `sub` - Subject (User ID)
-- `email` - User email
-- `exp` - Expiration time (default: 60 minutes)
-- `iss` - Issuer: `NotAloneAPI`
-- `aud` - Audience: `NotAloneClient`
-
-**Secret Key:** Configured in `appsettings.json`
-```json
-{
-  "Jwt": {
     "SecretKey": "YourSuperSecretKeyThatIsAtLeast32CharactersLongForHS256!",
     "Issuer": "NotAloneAPI",
     "Audience": "NotAloneClient",
@@ -604,65 +180,56 @@ The backend uses JWT (JSON Web Tokens) for stateless authentication:
 }
 ```
 
-**Usage:**
-1. Frontend stores token in localStorage after login
-2. Include in all requests: `Authorization: Bearer {token}`
-3. Backend validates token signature and expiration
-4. Token refresh requires re-login (no refresh tokens currently)
+### JWT Details
+- **Expiration:** 60 minutes (configurable)
+- **Algorithm:** HMAC SHA-256
+- **Token Claims:** User ID, Email, Username
+- **Secret Key:** Update before production deployment
 
 ---
 
-## 🎯 Dependency Injection (DI)
+## Database
 
-Services registered in Program.cs:
+Uses **SQL Server** with Entity Framework Core. Migrations run automatically on startup.
 
-```csharp
-builder.Services.AddScoped<GameStore>();
-builder.Services.AddScoped<GameEngine>();
-builder.Services.AddScoped<CreatureLogic>();
-builder.Services.AddScoped<SurvivalService>();
-builder.Services.AddScoped<TradeService>();
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
-```
-
-**Scoped Services:** New instance per HTTP request
-**DbContext:** Manages database connections and transactions
+**Tables:**
+- **Users** - User credentials
+- **GameSessions** - Active game state
+- **GameHistories** - Completed game records
+- **SurvivalCards** - Card library
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
-NotAlone.csproj
-├── Controllers/
-│   ├── AuthController.cs
-│   ├── GameController.cs
-│   ├── SurvivalController.cs
-│   └── TradeController.cs
-├── Services/
-│   ├── AppDbContext.cs
-│   ├── GameEngine.cs
-│   ├── GameStore.cs
-│   ├── SurvivalService.cs
-│   ├── CreatureLogic.cs
-│   └── TradeService.cs
-├── Models/
-│   ├── User.cs
-│   ├── GameSession.cs
-│   ├── GameHistory.cs
-│   ├── SurvivalCard.cs
-│   ├── SurvivalCardType.cs
-│   ├── PlayCardRequest.cs
-│   └── ResistRequest.cs
-├── Migrations/
-│   └── [EF Core migration files]
-├── Program.cs
-├── README.md
-├── ARCHITECTURE.md
-└── NotAlone.csproj
+NotAlone/
+├── Controllers/          - API endpoints
+├── Services/             - Business logic & database
+├── Models/               - Domain entities
+├── Migrations/           - EF Core migrations
+├── Program.cs            - Startup & DI configuration
+├── NotAlone.csproj       - Project file
+└── README.md
 ```
 
 ---
 
-## 🗄️ Database
+## Testing
+
+**Swagger UI:** https://notalone-api-bjbza7e9gafjfrfv.swedencentral-01.azurewebsites.net/swagger
+
+**HTTP Client File:** `NotAlone.http` contains pre-configured requests
+
+**Unit Tests:** `NotAlone.Tests/GameEngineModifierTests.cs`
+
+---
+
+## Production Deployment
+
+Before deploying:
+- [ ] Generate new JWT secret key
+- [ ] Configure SQL Server connection string
+- [ ] Enable HTTPS/SSL
+- [ ] Update CORS for frontend domain
+- [ ] Set up logging and monitoring

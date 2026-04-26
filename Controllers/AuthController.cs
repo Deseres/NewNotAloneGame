@@ -36,8 +36,11 @@ namespace NotAlone.Controllers
             if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
                 return BadRequest(new { message = "Email and password are required" });
 
-            if (request.Password.Length < 6)
-                return BadRequest(new { message = "Password must be at least 6 characters" });
+            if (request.Password.Length < 8)
+                return BadRequest(new { message = "Password must be at least 8 characters" });
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(request.Password, @"[!@#$%^&*()_+\-=\[\]{};':""\|,.<>\/?]"))
+                return BadRequest(new { message = "Password must contain at least one special character (!@#$%^&*)" });
 
             // Check if email already exists
             var existingUser = _dbContext.Users.FirstOrDefault(u => u.Email == request.Email);
