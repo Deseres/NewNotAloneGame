@@ -61,6 +61,7 @@ Content-Type: application/json
 |--------|----------|-------------|------|
 | POST | `/api/game/start` | Start a new game session | Required |
 | POST | `/api/game/{id}/play` | Play a round (choose location) | Required |
+| POST | `/api/game/{id}/creature-turn` | Creature turn (chooses location) | Required |
 | POST | `/api/game/{id}/next-round` | Move to next round | Required |
 
 ### Survival Cards
