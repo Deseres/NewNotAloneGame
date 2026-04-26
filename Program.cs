@@ -84,6 +84,17 @@ builder.Services.AddScoped<CreatureLogic>();
 builder.Services.AddScoped<SurvivalService>();
 builder.Services.AddScoped<TradeService>();
 
+// Add this before app.Build()
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
 // 5. Apply migrations on startup
@@ -94,7 +105,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // 6. Configure middleware pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 {
     app.UseSwagger();
     app.UseSwaggerUI(c => 
@@ -103,8 +114,11 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+app.UseCors("AllowAll");
 
 app.Run();
