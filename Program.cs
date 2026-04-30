@@ -115,10 +115,18 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 }
 
 app.UseHttpsRedirection();
+
+// Serve static files from wwwroot (frontend build output)
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
 app.UseCors("AllowAll");
+
+// SPA fallback: route non-API requests to index.html for client-side routing
+app.MapFallbackToFile("index.html");
 
 app.Run();

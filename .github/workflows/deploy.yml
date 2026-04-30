@@ -1,0 +1,47 @@
+name: Deploy Monolith to Azure
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '10.0.x'
+    
+    - name: Build Frontend
+      run: |
+        cd Frontend
+        npm install
+        npm run build
+        cd ..
+    
+    - name: Copy Frontend to Backend
+      run: |
+        rm -rf wwwroot
+        cp -r Frontend/dist wwwroot
+    
+    - name: Build Backend
+      run: dotnet build --configuration Release
+    
+    - name: Publish Backend
+      run: dotnet publish --configuration Release --no-build --output publish
+    
+    - name: Deploy to Azure
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: your-app-service-name
+        publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+        package: publish
