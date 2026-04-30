@@ -1,106 +1,130 @@
-<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
-- [ ] Verify that the copilot-instructions.md file in the .github directory is created.
+---
+description: 'Guidelines for NotAlone Game backend development'
+applyTo: '**/*.cs'
+---
 
-- [ ] Clarify Project Requirements
-	<!-- Ask for project type, language, and frameworks if not specified. Skip if already provided. -->
+# NotAlone Game - AI Development Guide
 
-- [ ] Scaffold the Project
-	<!--
-	Ensure that the previous step has been marked as completed.
-	Call project setup tool with projectType parameter.
-	Run scaffolding command to create project files and folders.
-	Use '.' as the working directory.
-	If no appropriate projectType is available, search documentation using available tools.
-	Otherwise, create the project structure manually using available file creation tools.
-	-->
+## Project Overview
 
-- [ ] Customize the Project
-	<!--
-	Verify that all previous steps have been completed successfully and you have marked the step as completed.
-	Develop a plan to modify codebase according to user requirements.
-	Apply modifications using appropriate tools and user-provided references.
-	Skip this step for "Hello World" projects.
-	-->
+**NotAlone** is a .NET 10 strategic survival game with creature AI mechanics. Players choose locations to survive while a creature with strategic AI tries to catch them. Key differentiators:
+- **Creature Second Phase**: When creature progress ≥ 4, creature blocks locations (negates effects) FIRST, then attacks SECOND from remaining locations
+- **Creature Modifiers**: Six special modifiers that activate randomly (DoubleDamage, BlockPlayerProgress, LoseRandomLocation, BeachAndWreckBlock, ExtraCreatureProgress)
+- **Card Effects**: Survival cards with location restoration, location duplication, and transformation effects
 
-- [ ] Install Required Extensions
-	<!-- ONLY install extensions provided mentioned in the get_project_setup_info. Skip this step otherwise and mark as completed. -->
+## Critical Architecture Patterns
 
-- [ ] Compile the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Install any missing dependencies.
-	Run diagnostics and resolve any issues.
-	Check for markdown files in project folder for relevant instructions on how to do this.
-	-->
+### 1. Game State Machine & Three-Phase Turn Structure
+**Files**: Services/GameEngine.cs, Models/GameSession.cs
 
-- [ ] Create and Run Task
-	<!--
-	Verify that all previous steps have been completed.
-	Check https://code.visualstudio.com/docs/debugtest/tasks to determine if the project needs a task. If so, use the create_and_run_task to create and launch a task based on package.json, README.md, and project structure.
-	Skip this step otherwise.
-	 -->
+Each round flows: **Selection** → **CreatureTurn** → **Result** → *next Selection*
 
-- [ ] Launch the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Prompt user for debug mode, launch only if confirmed.
-	 -->
+- **Selection**: Player chooses location (1-10) from `AvailableLocations`
+- **CreatureTurn**: Creature AI selects location. If `PlayerProgress >= 4`, creature now selects TWO locations:
+  1. `CreatureBlockingLocation` - chosen FIRST from `AvailableLocations + LastPlayerChoice`, negates player location effects if modifier active
+  2. `CreatureChosenLocation` - chosen SECOND from `AvailableLocations + LastPlayerChoice - CreatureBlockingLocation`, determines if player is caught
+- **Result**: Apply location effects, modifiers, catch logic. Call `ResolveRound()` before advancing
 
-- [ ] Ensure Documentation is Complete
-	<!--
-	Verify that all previous steps have been completed.
-	Verify that README.md and the copilot-instructions.md file in the .github directory exists and contains current project information.
-	Clean up the copilot-instructions.md file in the .github directory by removing all HTML comments.
-	 -->
+**Critical**: Always check `session.CurrentPhase` before allowing player actions. Blocking only applies when `CurrentModifier != None`.
 
-<!--
-## Execution Guidelines
-PROGRESS TRACKING:
-- If any tools are available to manage the above todo list, use it to track progress through this checklist.
-- After completing each step, mark it complete and add a summary.
-- Read current todo list status before starting each new step.
+### 2. Creature AI Decision Logic with Multi-Strategy
+**File**: Services/CreatureLogic.cs
 
-COMMUNICATION RULES:
-- Avoid verbose explanations or printing full command outputs.
-- If a step is skipped, state that briefly (e.g. "No extensions needed").
-- Do not explain project structure unless asked.
-- Keep explanations concise and focused.
+Creature uses **strategic mixing** of 3 approaches:
+1. **Trap Strategy**: Blocks beaches/wrecks (1,3,8) with `BeachAndWreckBlock` modifier to steal escape benefits
+2. **Interception Strategy**: Predicts player location choice and picks same location to catch
+3. **Exploitation Detection**: Monitors player location history - if player exploits same location 3+ times in 5 rounds, makes it primary target
 
-DEVELOPMENT RULES:
-- Use '.' as the working directory unless user specifies otherwise.
-- Avoid adding media or external links unless explicitly requested.
-- Use placeholders only with a note that they should be replaced.
-- VS Code API tool only for VS Code extension projects.
-- Once the project is created, it is already opened in Visual Studio Code—do not suggest commands to open this project in Visual Studio again.
-- If the project setup information has additional rules, follow them strictly.
+Key method: `DetermineOptimalCreatureLocation(session, currentModifier, candidateLocations)` - scores all locations in `candidateLocations` list, NOT all 10 locations.
 
-FOLDER CREATION RULES:
-- Always use the current directory as the project root.
-- If you are running any terminal commands, use the '.' argument to ensure that the current working directory is used ALWAYS.
-- Do not create a new folder unless the user explicitly requests it besides a .vscode folder for a tasks.json file.
-- If any of the scaffolding commands mention that the folder name is not correct, let the user know to create a new folder with the correct name and then reopen it again in vscode.
+**Important**: When adding location evaluation logic, always use the `candidateLocations` parameter passed in, not `session.AvailableLocations` directly.
 
-EXTENSION INSTALLATION RULES:
-- Only install extension specified by the get_project_setup_info tool. DO NOT INSTALL any other extensions.
+### 3. Creature Modifier System - Location-Specific Application
+**File**: Services/GameEngine.cs (lines ~165-200)
 
-PROJECT CONTENT RULES:
-- If the user has not specified project details, assume they want a "Hello World" project as a starting point.
-- Avoid adding links of any type (URLs, files, folders, etc.) or integrations that are not explicitly required.
-- Avoid generating images, videos, or any other media files unless explicitly requested.
-- If you need to use any media assets as placeholders, let the user know that these are placeholders and should be replaced with the actual assets later.
-- Ensure all generated components serve a clear purpose within the user's requested workflow.
-- If a feature is assumed but not confirmed, prompt the user for clarification before including it.
-- If you are working on a VS Code extension, use the VS Code API tool with a query to find relevant VS Code API references and samples related to that query.
+Modifiers ONLY apply to `CreatureChosenLocation` (the attack location), NOT to `CreatureBlockingLocation`:
+- **DoubleDamage**: Player loses 2 willpower instead of 1 when caught
+- **BlockPlayerProgress**: Escape doesn't increase player progress (if not caught)
+- **LoseRandomLocation**: Player loses random available location when caught
+- **BeachAndWreckBlock**: Blocks Beach(4) and Wreck(8) location effects for player (both catch and escape)
+- **ExtraCreatureProgress**: Creature gains +2 progress instead of +1 when catching player
+- **None**: Creature gets 0 progress bonus (creature still catches, but minimal advancement)
 
-TASK COMPLETION RULES:
-- Your task is complete when:
-  - Project is successfully scaffolded and compiled without errors
-  - copilot-instructions.md file in the .github directory exists in the project
-  - README.md file exists and is up to date
-  - User is provided with clear instructions to debug/launch the project
+**Critical Design Rule**: `CurrentModifier == None` has special meaning - it disables Artefact protection AND blocks the blocking location negation effect.
 
-Before starting a new task in the above plan, update progress in the plan.
--->
-- Work through each checklist item systematically.
-- Keep communication concise and focused.
-- Follow development best practices.
+### 4. Location Effects & Card Interaction
+**File**: Services/GameEngine.cs (lines ~250-420)
+
+Location special effects only trigger if:
+1. Player chooses that location (playerChoice == location ID)
+2. Location is NOT blocked: `!isLocationBlocked` (blocking negates special effects)
+3. Player survives (not caught by creature)
+
+Example locations:
+- **Forest(2)**: Restore one random used location to available
+- **Beach(4)**: Gain progress bonus on escape (disabled by BeachAndWreckBlock modifier)
+- **Wreck(8)**: Lose location penalty on catch (disabled by BeachAndWreckBlock modifier)
+
+## Critical Implementation Details
+
+### Session State Properties
+- `AvailableLocations`: Pool player can choose from each turn (1-10)
+- `UsedLocations`: Locations already used, must be "restored" to available before use again
+- `CreatureChosenLocation`: Creature's attack location (deferred comparison happens in ResolveRound)
+- `CreatureBlockingLocation`: Creature's blocking location (only when progress >= 4 AND modifier active)
+- `LastPlayerChoice` / `LastCreatureChoice`: Previous turn choices, used for strategy tracking
+- `CurrentModifier`: Active modifier this round, affects damage/effects calculations
+- `CurrentPhase`: Enforced state machine - prevents invalid action sequences
+
+### When Adding Game Logic
+
+1. **Check phase first**: `if (session.CurrentPhase != GamePhase.ExpectedPhase) return BadRequest(...)`
+2. **Preserve existing location data**: Don't mutate `AvailableLocations` list directly in loops; use `.ToList()` or `.Where()`
+3. **Deferred creature choice**: Never compare creature vs player location in `SelectCreatureLocation()` - only in `ResolveRound()`
+4. **Blocking logic**: Always verify `session.CreatureBlockingLocation.HasValue && session.CurrentModifier != CreatureModifier.None` before applying block effects
+5. **Progress threshold**: Use `if (session.PlayerProgress >= 4)` to enable second-phase mechanics
+
+## Build & Testing Workflow
+
+### Build Commands
+```bash
+dotnet build                    # Debug build
+dotnet build -c Release         # Release build
+dotnet run                      # Run API on localhost:5000
+dotnet test                     # Run all tests in NotAlone.Tests/
+```
+
+### Key Test Files
+- **NotAlone.Tests/GameEngineModifierTests.cs**: Tests each modifier's behavior with catch/escape scenarios
+- Test pattern: Create `GameSession` with `CreateTestSession()` helper, configure modifier, call `engine.ApplyCreatureModifier()` or `engine.ResolveRound()`
+- Tests verify damage, progress, willpower, and status messages
+
+### API Endpoints
+- `POST /api/game/start` - Create new session
+- `POST /api/game/{id}/play` - Player chooses location (Selection phase)
+- `POST /api/game/{id}/creature-turn` - Creature AI selects (CreatureTurn phase)
+- `POST /api/game/{id}/next-round` - Resolve effects & advance (Result → Selection)
+
+## Code Patterns Specific to NotAlone
+
+### Mutation Patterns
+- Always `.ToList()` when creating modified location lists to avoid list mutation during iteration
+- Use `session.UsedLocations.Remove(loc)` and `session.AvailableLocations.Add(loc)` atomically
+- Never reassign `AvailableLocations` directly; modify in place
+
+### Status Message Convention
+- All game events logged to `session.StatusMessage` with prefix: `[MethodName]` or `[PhaseName]`
+- Examples: `"[CreatureTurn] ✓ Существо выбрало локацию 5 (High Value). Модификатор: DoubleDamage."`
+- Used by frontend to display game progression to player
+
+### Nullable Reference Types
+- Creature locations: `int?` (nullable - creature might not select if no locations available)
+- `session.LastPlayerChoice.HasValue` before accessing `.Value`
+- `session.CreatureBlockingLocation.HasValue` before comparing locations
+
+## C# Code Standards (Inherited)
+
+- C# 14 features, file-scoped namespaces, `is null` checks
+- XML doc comments on public methods explaining creature behavior impact
+- No "Arrange/Act/Assert" comments in tests; copy style from existing `GameEngineModifierTests.cs`
+- PascalCase for public, camelCase for private fields

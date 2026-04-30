@@ -141,7 +141,27 @@ public class CreatureLogic
 			session.CurrentModifier = modifiers[_random.Next(modifiers.Length)];
 		}
 
-		// Creature chooses from all possible locations unless river vision has pre-generated the choice
+		// SECOND PHASE: Creature blocks a location when player progress > 1
+		// Blocking location is chosen FIRST from: AvailableLocations + LastPlayerChoice
+		int? blockingLocation = null;
+		if (session.PlayerProgress >= 4)
+		{
+			// Build candidate pool: AvailableLocations + LastPlayerChoice
+			var blockingCandidates = new List<int>(session.AvailableLocations);
+			if (session.LastPlayerChoice.HasValue && !blockingCandidates.Contains(session.LastPlayerChoice.Value))
+			{
+				blockingCandidates.Add(session.LastPlayerChoice.Value);
+			}
+
+			// Only pick blocking location if it would leave at least 1 attack candidate
+			if (blockingCandidates.Count > 1)
+			{
+				blockingLocation = blockingCandidates[_random.Next(blockingCandidates.Count)];
+				session.CreatureBlockingLocation = blockingLocation;
+			}
+		}
+
+		// Creature attacks SECOND from: AvailableLocations + LastPlayerChoice - CreatureBlockingLocation
 		int creatureChoice;
 		string selectionLogic = "";
 
@@ -152,20 +172,39 @@ public class CreatureLogic
 		}
 		else
 		{
+			// Build candidate pool: AvailableLocations + LastPlayerChoice, excluding blocking location
+			var attackCandidates = new List<int>(session.AvailableLocations);
+			if (session.LastPlayerChoice.HasValue && !attackCandidates.Contains(session.LastPlayerChoice.Value))
+			{
+				attackCandidates.Add(session.LastPlayerChoice.Value);
+			}
+			
+			// Remove blocking location from attack candidates if it exists
+			if (blockingLocation.HasValue)
+			{
+				attackCandidates.Remove(blockingLocation.Value);
+			}
+
 			// Make strategic location decision based on the randomly chosen modifier
-			creatureChoice = DetermineOptimalCreatureLocation(session, session.CurrentModifier, out selectionLogic);
+			creatureChoice = DetermineOptimalCreatureLocation(session, session.CurrentModifier, attackCandidates, out selectionLogic);
 		}
 
 		// Store creature's chosen location for deferred comparison in ResolveRound
 		session.CreatureChosenLocation = creatureChoice;
 		session.StatusMessage = $"[CreatureTurn] ✓ Существо выбрало локацию {creatureChoice} {selectionLogic}. Модификатор: {session.CurrentModifier}. Переход в Result фазу...";
+
+		if (blockingLocation.HasValue)
+		{
+			session.StatusMessage += $"\n[Phase 2] Существо выбрало блокирующую локацию: {blockingLocation} (скрыто от игрока).";
+		}
 	}
 
 	/// <summary>
 	/// AI decision engine to determine the optimal location choice based on the assigned modifier.
 	/// Makes strategic decisions to maximize the effectiveness of the current modifier.
+	/// Optionally accepts a custom candidate pool for location selection.
 	/// </summary>
-	private int DetermineOptimalCreatureLocation(GameSession session, CreatureModifier currentModifier, out string selectionLogic)
+	private int DetermineOptimalCreatureLocation(GameSession session, CreatureModifier currentModifier, List<int> candidateLocations, out string selectionLogic)
 	{
 		selectionLogic = "";
 
@@ -173,7 +212,7 @@ public class CreatureLogic
 		DetectPlayerLocationExploitation(session);
 		
 		// If we detect a player exploiting a location, prioritize catching them there
-		if (_detectedExploitLocation.HasValue && session.AvailableLocations.Contains(_detectedExploitLocation.Value))
+		if (_detectedExploitLocation.HasValue && candidateLocations.Contains(_detectedExploitLocation.Value))
 		{
 			selectionLogic = $"(⚠️ ОБНАРУЖЕНА ЭКСПЛУАТАЦИЯ - игрок повторяет локацию {_detectedExploitLocation}!)";
 			return _detectedExploitLocation.Value;
@@ -182,7 +221,7 @@ public class CreatureLogic
 		// ===== PHASE 0.5: DETECT ABUSE OF LOCATIONS 2 & 6 =====
 		// If player is abusing locations 2 or 6 through consecutive use, PRIORITIZE catching them there
 		int? abusedLocationForCatch = DetectLocationAbusePattern();
-		if (abusedLocationForCatch.HasValue && session.AvailableLocations.Contains(abusedLocationForCatch.Value))
+		if (abusedLocationForCatch.HasValue && candidateLocations.Contains(abusedLocationForCatch.Value))
 		{
 			selectionLogic = $"(🎯 ПЕРЕХВАТ АБУСИВА - локация {abusedLocationForCatch} использована дважды подряд!)";
 			return abusedLocationForCatch.Value;
@@ -264,7 +303,7 @@ public class CreatureLogic
 
 		// ===== PHASE 3: FALLBACK TO LOCATION VALUE ANALYSIS =====
 		// Evaluate all available locations considering the current modifier's effectiveness
-		var locationScores = EvaluateAllLocations(session, currentModifier);
+		var locationScores = EvaluateAllLocations(session, currentModifier, candidateLocations);
 		var bestLocation = locationScores.OrderByDescending(x => x.Value).First().Key;
 
 		var topScore = locationScores[bestLocation];
@@ -282,8 +321,9 @@ public class CreatureLogic
 	/// Evaluates each location (1-10) based on strategic value with the given modifier.
 	/// Higher scores = more valuable for creature given the current modifier.
 	/// Incorporates dynamic context-aware adjustments based on game state.
+	/// Only evaluates locations from the provided candidateLocations list.
 	/// </summary>
-	private Dictionary<int, int> EvaluateAllLocations(GameSession session, CreatureModifier currentModifier)
+	private Dictionary<int, int> EvaluateAllLocations(GameSession session, CreatureModifier currentModifier, List<int> candidateLocations)
 	{
 		var scores = new Dictionary<int, int>();
 
@@ -296,11 +336,10 @@ public class CreatureLogic
 		{
 			int score = 0;
 
-			// Only score available locations, or treat lastPlayerChoice equally even if not available
-			bool isAvailable = session.AvailableLocations.Contains(loc);
-			bool isLastPlayerChoice = session.LastPlayerChoice.HasValue && session.LastPlayerChoice.Value == loc;
+			// Only score candidate locations
+			bool isCandidate = candidateLocations.Contains(loc);
 			
-			if (!isAvailable && !isLastPlayerChoice)
+			if (!isCandidate)
 				continue;
 
 			// Location-specific strategic value (DYNAMIC ADJUSTMENTS)

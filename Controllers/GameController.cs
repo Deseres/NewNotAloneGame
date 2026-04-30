@@ -22,6 +22,16 @@ public class GameController : ControllerBase
         _creatureLogic = creatureLogic;
     }
 
+    [HttpGet("{id}")]
+    public async Task<ActionResult<GameSession>> GetSession(Guid id)
+    {
+        var session = await _store.GetSessionAsync(id);
+        if (session is null)
+            return NotFound(new { error = "❌ Игровая сессия не найдена." });
+        
+        return Ok(new { session = session });
+    }
+
     [HttpPost("start")]
     public async Task<ActionResult<GameSession>> StartGame()
     {
@@ -117,13 +127,31 @@ public class GameController : ControllerBase
         {
             if (session.AvailableLocations.Count > 0)
             {
-                var idx = Random.Shared.Next(session.AvailableLocations.Count);
-                var preChoice = session.AvailableLocations[idx];
-                session.LastCreatureChoice = preChoice;
-                session.IsRiverVisionRevealed = true;
-                session.StatusMessage = $"[NextRound] 👁️ Видение реки активно: Существо пойдёт на локацию {preChoice}. Выберите вашу локацию.";
-                await _store.UpdateSessionAsync(session);
-                return Ok(new { message = session.StatusMessage, session = session });
+                // Build candidates for River Vision pre-choice: only AvailableLocations (no LastPlayerChoice)
+                // LastPlayerChoice was already processed in current round and moved to UsedLocations
+                var riverVisionCandidates = new List<int>(session.AvailableLocations);
+
+                // If second phase active, predict and exclude the blocking location
+                int? predictedBlockingLocation = null;
+                if (session.PlayerProgress >= 4 && riverVisionCandidates.Count > 1)
+                {
+                    // Simulate blocking location selection (random from candidates)
+                    // In real game creature AI will pick strategically, but for River Vision we use random
+                    predictedBlockingLocation = riverVisionCandidates[Random.Shared.Next(riverVisionCandidates.Count)];
+                    riverVisionCandidates.Remove(predictedBlockingLocation.Value);
+                }
+
+                // Now pick River Vision choice from remaining candidates
+                if (riverVisionCandidates.Count > 0)
+                {
+                    var idx = Random.Shared.Next(riverVisionCandidates.Count);
+                    var preChoice = riverVisionCandidates[idx];
+                    session.LastCreatureChoice = preChoice;
+                    session.IsRiverVisionRevealed = true;
+                    session.StatusMessage = $"[NextRound] 👁️ Видение реки активно: Существо пойдёт на локацию {preChoice}. Выберите вашу локацию.";
+                    await _store.UpdateSessionAsync(session);
+                    return Ok(new { message = session.StatusMessage, session = session });
+                }
             }
         }
 

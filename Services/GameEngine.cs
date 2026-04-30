@@ -256,6 +256,12 @@ public class GameEngine
 
 		var wasCaught = playerChoice.HasValue && creatureChoice.HasValue && playerChoice.Value == creatureChoice.Value;
 
+		// Check if location is blocked by creature's second phase blocking location
+		// Blocking is only active when modifier is not disabled
+		var isLocationBlocked = playerChoice.HasValue && session.CreatureBlockingLocation.HasValue && 
+		                        playerChoice.Value == session.CreatureBlockingLocation.Value &&
+		                        session.CurrentModifier != CreatureModifier.None; // Artefact disables blocking too
+
 		// Perform the actual comparison (creature vs player)
 		if (playerChoice.HasValue && creatureChoice.HasValue)
 		{
@@ -297,6 +303,12 @@ public class GameEngine
 					session.StatusMessage += " Но весь Ваш прогресс был заблокирован модификатором!";
 				else if (session.CurrentModifier == CreatureModifier.BeachAndWreckBlock && (playerChoice == 4 || playerChoice == 8))
 					session.StatusMessage += " Но дополнительный эффект локации был заблокирован!";
+				
+				// SECOND PHASE: Check if location effects are blocked
+				if (isLocationBlocked)
+				{
+					session.StatusMessage += $" ⚠️ Эффект локации {playerChoice} был заблокирован вторым выбором Существа!";
+				}
 			}
 
 			// Victory Check after comparison
@@ -343,7 +355,7 @@ public class GameEngine
 		else
 		{
 			// Not caught: handle special locations for player's choice
-			if (playerChoice.HasValue)
+			if (playerChoice.HasValue && !isLocationBlocked)
 			{
 				// Check if location effects should be blocked by BeachAndWreckBlock modifier
 				bool blockLocationBonus = (session.CurrentModifier == CreatureModifier.BeachAndWreckBlock && (playerChoice == 4 || playerChoice == 8));

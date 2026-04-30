@@ -79,6 +79,9 @@ namespace NotAlone.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("CreatureBlockingLocation")
+                        .HasColumnType("int");
+
                     b.Property<int?>("CreatureChosenLocation")
                         .HasColumnType("int");
 

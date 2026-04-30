@@ -64,6 +64,10 @@ public class GameSession
     // Creature's chosen location (for deferred comparison in ResolveRound)
     public int? CreatureChosenLocation { get; set; }
 
+    // Creature's blocking location in second phase (player progress >= 4)
+    // When creature chooses this location, it negates the location's special effect
+    public int? CreatureBlockingLocation { get; set; }
+
     public bool IsArtefactActive { get; set; } = false;
 
     public CreatureModifier CurrentModifier { get; set; } = CreatureModifier.None;
