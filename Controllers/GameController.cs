@@ -36,10 +36,12 @@ public class GameController : ControllerBase
     public async Task<ActionResult<GameSession>> StartGame()
     {
         var session = new GameSession();
-        // Give player one random survival card (IDs 1-5)
         int randomCard = Random.Shared.Next(1, 6);
         session.AvailableSurvivalCards = new List<int> { randomCard };
         session.StatusMessage = "🎮 Игра началась! Выживание маловероятно. Выберите локацию для начала.";
+
+        _creatureLogic.ResetHistory();  
+
         await _store.CreateSessionAsync(session);
         _store.Sessions[session.Id] = session;
         return Ok(new { message = session.StatusMessage, session = session });
@@ -120,7 +122,12 @@ public class GameController : ControllerBase
         }
 
         // If game continues, move to next Selection phase
+        session.RoundNumber++;
         session.CurrentPhase = GamePhase.Selection;
+
+        // Save current choices to previous for next round's creature learning
+        session.PreviousPlayerChoice = session.CurrentPlayerChoice;
+        session.PreviousCreatureChoice = session.CreatureChosenLocation;
 
         // If river vision is active, pre-generate the Creature's move for next round
         if (session.IsRiverVisionActive && !session.IsRiverVisionRevealed)
@@ -146,7 +153,7 @@ public class GameController : ControllerBase
                 {
                     var idx = Random.Shared.Next(riverVisionCandidates.Count);
                     var preChoice = riverVisionCandidates[idx];
-                    session.LastCreatureChoice = preChoice;
+                    session.PreviousCreatureChoice = preChoice;
                     session.IsRiverVisionRevealed = true;
                     session.StatusMessage = $"[NextRound] 👁️ Видение реки активно: Существо пойдёт на локацию {preChoice}. Выберите вашу локацию.";
                     await _store.UpdateSessionAsync(session);

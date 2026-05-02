@@ -7,124 +7,97 @@ applyTo: '**/*.cs'
 
 ## Project Overview
 
-**NotAlone** is a .NET 10 strategic survival game with creature AI mechanics. Players choose locations to survive while a creature with strategic AI tries to catch them. Key differentiators:
-- **Creature Second Phase**: When creature progress ≥ 4, creature blocks locations (negates effects) FIRST, then attacks SECOND from remaining locations
-- **Creature Modifiers**: Six special modifiers that activate randomly (DoubleDamage, BlockPlayerProgress, LoseRandomLocation, BeachAndWreckBlock, ExtraCreatureProgress)
-- **Card Effects**: Survival cards with location restoration, location duplication, and transformation effects
+**NotAlone** is a .NET 10 strategic survival game. Players (progress target: 7) choose locations to survive while a creature (progress target: 5) with strategic AI tries to catch them. Stack: ASP.NET Core Web API + EF Core (SQLite/SQL Server) + React/TypeScript frontend served as SPA from `wwwroot/`.
 
-## Critical Architecture Patterns
+Win/loss: `PlayerProgress >= MaxPlayerProgress (7)` = player wins; `CreatureProgress >= MaxCreatureProgress (5)` OR `PlayerWillpower <= 0` = creature wins.
 
-### 1. Game State Machine & Three-Phase Turn Structure
-**Files**: Services/GameEngine.cs, Models/GameSession.cs
+## Three-Phase Turn State Machine
 
-Each round flows: **Selection** → **CreatureTurn** → **Result** → *next Selection*
+**Files**: [Services/GameEngine.cs](../Services/GameEngine.cs), [Models/GameSession.cs](../Models/GameSession.cs)
 
-- **Selection**: Player chooses location (1-10) from `AvailableLocations`
-- **CreatureTurn**: Creature AI selects location. If `PlayerProgress >= 4`, creature now selects TWO locations:
-  1. `CreatureBlockingLocation` - chosen FIRST from `AvailableLocations + LastPlayerChoice`, negates player location effects if modifier active
-  2. `CreatureChosenLocation` - chosen SECOND from `AvailableLocations + LastPlayerChoice - CreatureBlockingLocation`, determines if player is caught
-- **Result**: Apply location effects, modifiers, catch logic. Call `ResolveRound()` before advancing
+`Selection → CreatureTurn → Result → (next) Selection`
 
-**Critical**: Always check `session.CurrentPhase` before allowing player actions. Blocking only applies when `CurrentModifier != None`.
+| Phase | API endpoint | What happens |
+|---|---|---|
+| Selection | `POST /api/game/{id}/play` | Player picks location from `AvailableLocations`; location moved to `UsedLocations`; `CurrentPlayerChoice` set |
+| CreatureTurn | `POST /api/game/{id}/creature-turn` | `CreatureLogic` sets `CreatureChosenLocation` (and `CreatureBlockingLocation` when `PlayerProgress >= 4`) |
+| Result | `POST /api/game/{id}/next-round` | `ResolveRound()` runs; effects applied; `PreviousPlayerChoice` and `PreviousCreatureChoice` updated for next round's creature learning; history saved if game over |
 
-### 2. Creature AI Decision Logic with Multi-Strategy
-**File**: Services/CreatureLogic.cs
+**Always guard with phase checks**: `if (session.CurrentPhase != GamePhase.Selection) return BadRequest(...)`.
 
-Creature uses **strategic mixing** of 3 approaches:
-1. **Trap Strategy**: Blocks beaches/wrecks (1,3,8) with `BeachAndWreckBlock` modifier to steal escape benefits
-2. **Interception Strategy**: Predicts player location choice and picks same location to catch
-3. **Exploitation Detection**: Monitors player location history - if player exploits same location 3+ times in 5 rounds, makes it primary target
+## Location Map
 
-Key method: `DetermineOptimalCreatureLocation(session, currentModifier, candidateLocations)` - scores all locations in `candidateLocations` list, NOT all 10 locations.
+`AvailableLocations` starts as `[1,2,3,4,5]` (NOT all 10). Locations 6-10 unlock progressively.
 
-**Important**: When adding location evaluation logic, always use the `candidateLocations` parameter passed in, not `session.AvailableLocations` directly.
+| ID | Name | Effect on escape (not blocked) |
+|---|---|---|
+| 1 | Lair | Copies creature's chosen location effect |
+| 2 | Jungle | Restores 1 random used location; preserves card in hand |
+| 3 | River | Activates `IsRiverVisionActive` — creature pre-move shown next round |
+| 4 | Beach | Lights beacon / grants player progress (`BeachAndWreckBlock` disables) |
+| 8 | Wreck | Saves location from being lost on catch (`BeachAndWreckBlock` disables) |
+| 9 | Source | Restores 1 willpower |
+| 10 | Artefact | Sets `IsArtefactActive = true` → disables `CurrentModifier` AND `CreatureBlockingLocation` next round |
 
-### 3. Creature Modifier System - Location-Specific Application
-**File**: Services/GameEngine.cs (lines ~165-200)
+## Second-Phase Blocking (PlayerProgress ≥ 4)
 
-Modifiers ONLY apply to `CreatureChosenLocation` (the attack location), NOT to `CreatureBlockingLocation`:
-- **DoubleDamage**: Player loses 2 willpower instead of 1 when caught
-- **BlockPlayerProgress**: Escape doesn't increase player progress (if not caught)
-- **LoseRandomLocation**: Player loses random available location when caught
-- **BeachAndWreckBlock**: Blocks Beach(4) and Wreck(8) location effects for player (both catch and escape)
-- **ExtraCreatureProgress**: Creature gains +2 progress instead of +1 when catching player
-- **None**: Creature gets 0 progress bonus (creature still catches, but minimal advancement)
+When `PlayerProgress >= 4`, creature selects **two** locations:
+1. `CreatureBlockingLocation` — chosen FIRST from `AvailableLocations + CurrentPlayerChoice`; negates that location's effect
+2. `CreatureChosenLocation` — chosen SECOND from remaining candidates; determines if caught
 
-**Critical Design Rule**: `CurrentModifier == None` has special meaning - it disables Artefact protection AND blocks the blocking location negation effect.
-
-### 4. Location Effects & Card Interaction
-**File**: Services/GameEngine.cs (lines ~250-420)
-
-Location special effects only trigger if:
-1. Player chooses that location (playerChoice == location ID)
-2. Location is NOT blocked: `!isLocationBlocked` (blocking negates special effects)
-3. Player survives (not caught by creature)
-
-Example locations:
-- **Forest(2)**: Restore one random used location to available
-- **Beach(4)**: Gain progress bonus on escape (disabled by BeachAndWreckBlock modifier)
-- **Wreck(8)**: Lose location penalty on catch (disabled by BeachAndWreckBlock modifier)
-
-## Critical Implementation Details
-
-### Session State Properties
-- `AvailableLocations`: Pool player can choose from each turn (1-10)
-- `UsedLocations`: Locations already used, must be "restored" to available before use again
-- `CreatureChosenLocation`: Creature's attack location (deferred comparison happens in ResolveRound)
-- `CreatureBlockingLocation`: Creature's blocking location (only when progress >= 4 AND modifier active)
-- `LastPlayerChoice` / `LastCreatureChoice`: Previous turn choices, used for strategy tracking
-- `CurrentModifier`: Active modifier this round, affects damage/effects calculations
-- `CurrentPhase`: Enforced state machine - prevents invalid action sequences
-
-### When Adding Game Logic
-
-1. **Check phase first**: `if (session.CurrentPhase != GamePhase.ExpectedPhase) return BadRequest(...)`
-2. **Preserve existing location data**: Don't mutate `AvailableLocations` list directly in loops; use `.ToList()` or `.Where()`
-3. **Deferred creature choice**: Never compare creature vs player location in `SelectCreatureLocation()` - only in `ResolveRound()`
-4. **Blocking logic**: Always verify `session.CreatureBlockingLocation.HasValue && session.CurrentModifier != CreatureModifier.None` before applying block effects
-5. **Progress threshold**: Use `if (session.PlayerProgress >= 4)` to enable second-phase mechanics
-
-## Build & Testing Workflow
-
-### Build Commands
-```bash
-dotnet build                    # Debug build
-dotnet build -c Release         # Release build
-dotnet run                      # Run API on localhost:5000
-dotnet test                     # Run all tests in NotAlone.Tests/
+**Blocking only activates when `CurrentModifier != CreatureModifier.None`**. `IsArtefactActive` sets modifier to `None`, disabling both modifier AND blocking. Always check:
+```csharp
+var isLocationBlocked = playerChoice == session.CreatureBlockingLocation
+    && session.CurrentModifier != CreatureModifier.None;
 ```
 
-### Key Test Files
-- **NotAlone.Tests/GameEngineModifierTests.cs**: Tests each modifier's behavior with catch/escape scenarios
-- Test pattern: Create `GameSession` with `CreateTestSession()` helper, configure modifier, call `engine.ApplyCreatureModifier()` or `engine.ResolveRound()`
-- Tests verify damage, progress, willpower, and status messages
+## Player Choice Naming Convention (CRITICAL FOR FAIRNESS)
 
-### API Endpoints
-- `POST /api/game/start` - Create new session
-- `POST /api/game/{id}/play` - Player chooses location (Selection phase)
-- `POST /api/game/{id}/creature-turn` - Creature AI selects (CreatureTurn phase)
-- `POST /api/game/{id}/next-round` - Resolve effects & advance (Result → Selection)
+- **`CurrentPlayerChoice`**: Player's choice **THIS round** (set during Selection phase). Used for catch comparison.
+- **`PreviousPlayerChoice`**: Player's choice **LAST round** (set at end of Result phase). **CreatureLogic uses this for pattern prediction** to avoid cheating.
+- **`_playerLocationHistory`**: Only contains `PreviousPlayerChoice` values (past rounds), never current round. Ensures creature can't abuse current-round information.
 
-## Code Patterns Specific to NotAlone
+**This prevents unfair prediction**: Creature sees history of past plays, predicts next move, but cannot see what player chose this round until Result phase resolves.
 
-### Mutation Patterns
-- Always `.ToList()` when creating modified location lists to avoid list mutation during iteration
-- Use `session.UsedLocations.Remove(loc)` and `session.AvailableLocations.Add(loc)` atomically
-- Never reassign `AvailableLocations` directly; modify in place
+## Creature Modifier System
 
-### Status Message Convention
-- All game events logged to `session.StatusMessage` with prefix: `[MethodName]` or `[PhaseName]`
-- Examples: `"[CreatureTurn] ✓ Существо выбрало локацию 5 (High Value). Модификатор: DoubleDamage."`
-- Used by frontend to display game progression to player
+Modifiers apply to `CreatureChosenLocation` (attack) only, never to `CreatureBlockingLocation`:
 
-### Nullable Reference Types
-- Creature locations: `int?` (nullable - creature might not select if no locations available)
-- `session.LastPlayerChoice.HasValue` before accessing `.Value`
-- `session.CreatureBlockingLocation.HasValue` before comparing locations
+- `DoubleDamage` — extra -1 willpower on catch
+- `BlockPlayerProgress` — blocks ALL escape progress
+- `LoseRandomLocation` — player loses a random available location on catch
+- `BeachAndWreckBlock` — disables Beach(4) and Wreck(8) effects
+- `ExtraCreatureProgress` — creature gains +2 progress on catch
+- `None` — special: disables Artefact protection AND blocking negation
 
-## C# Code Standards (Inherited)
+## Creature AI (`CreatureLogic.cs`)
 
-- C# 14 features, file-scoped namespaces, `is null` checks
-- XML doc comments on public methods explaining creature behavior impact
-- No "Arrange/Act/Assert" comments in tests; copy style from existing `GameEngineModifierTests.cs`
-- PascalCase for public, camelCase for private fields
+Three mixed strategies tracked via success rates:
+1. **Trap** — targets beach/wreck locations (1, 3, 8) with `BeachAndWreckBlock`
+2. **Interception** — predicts player's next location from `_playerLocationHistory`
+3. **Exploitation** — if same location used 3+ times in last 5 rounds (`_singleLocationObsessionThreshold`), prioritizes it
+
+`DetermineOptimalCreatureLocation(session, modifier, candidateLocations)` scores only the **passed `candidateLocations`**, never `session.AvailableLocations` directly.
+
+## Data Persistence
+
+`GameStore` wraps EF Core (`AppDbContext`). Sessions are persisted to the database — **not in-memory**. Migrations live in `Migrations/`. Run `dotnet ef migrations add <Name>` for schema changes.
+
+## Build & Test
+
+```bash
+dotnet build                  # Debug build
+dotnet run                    # API on http://localhost:5000
+dotnet test                   # Runs NotAlone.Tests/
+dotnet ef migrations add Name # Add EF migration
+```
+
+Tests in [NotAlone.Tests/GameEngineModifierTests.cs](../NotAlone.Tests/GameEngineModifierTests.cs): use `CreateTestSession()` helper, configure `CurrentModifier`, call `engine.ApplyCreatureModifier()` or `engine.ResolveRound()`. No Arrange/Act/Assert comments — match existing style.
+
+## Key Conventions
+
+- **Status messages**: Append to `session.StatusMessage` with phase prefix: `[Selection] ✓ ...`, `[CreatureTurn] ...`, `[Result] ⚠️ ...`
+- **Location list mutation**: Use `.Remove()`/`.Add()` in place; never reassign `AvailableLocations`; use `.ToList()` copies in loops
+- **Nullable creature locations**: Always `.HasValue` guard before `.Value` on `int?` session fields
+- **Deferred comparison**: Never compare creature vs player location in `CreatureTurn` — only inside `ResolveRound()`
+- **C# style**: C# 14, file-scoped namespaces, `is null` checks, XML doc on public methods, PascalCase public / camelCase private

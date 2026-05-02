@@ -226,11 +226,51 @@ NotAlone/
 
 ---
 
-## Production Deployment
+## Deployment
 
-Before deploying:
-- [ ] Generate new JWT secret key
-- [ ] Configure SQL Server connection string
+### Local Monolith Deployment (Manual)
+
+This project uses **manual local deployment** - no automated CI/CD pipelines. Deploy from VS Code:
+
+#### 1. Build Locally
+```bash
+# Build the backend
+dotnet build -c Release
+
+# Build the frontend
+cd Frontend
+npm run build
+cd ..
+```
+
+#### 2. Publish as Monolith
+```bash
+dotnet publish -c Release
+```
+This creates `/bin/Release/net10.0/publish/` containing:
+- Backend API executable
+- Frontend assets in `wwwroot/`
+- All dependencies
+
+#### 3. Deploy Package
+Copy the entire `/bin/Release/net10.0/publish/` folder to your hosting server.
+
+#### 4. Run
+```bash
+# On the server
+cd publish
+dotnet NotAlone.dll --urls=http://localhost:5000
+```
+
+The API and frontend are served together from the same application.
+
+### Pre-Deployment Checklist
+
+Before pushing to production:
+- [ ] Generate new JWT secret key (update `appsettings.json`)
+- [ ] Configure SQL Server connection string for production
 - [ ] Enable HTTPS/SSL
-- [ ] Update CORS for frontend domain
+- [ ] Update CORS for your frontend domain
 - [ ] Set up logging and monitoring
+- [ ] Test authentication flow
+- [ ] Verify all game mechanics work end-to-end

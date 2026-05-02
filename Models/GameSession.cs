@@ -28,8 +28,10 @@ public class GameSession
     public int PlayerWillpower { get; set; } = 3;
     public int PlayerProgress { get; set; } = 0;
     public int CreatureProgress { get; set; } = 0;
-    public int? LastCreatureChoice { get; set; }
-    public int? LastPlayerChoice { get; set; }
+    public int? CurrentPlayerChoice { get; set; }
+    public int? PreviousPlayerChoice { get; set; }
+    public int? CurrentCreatureChoice { get; set; }
+    public int? PreviousCreatureChoice { get; set; }
     public bool IsGameOver { get; set; } = false;
     public bool IsBeaconLit { get; set; } = false;
     // River vision: when true, next round the Creature's move will be visible to player

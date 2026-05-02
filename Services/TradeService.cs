@@ -70,6 +70,16 @@ public class TradeService
         
         session.UsedLocations.Clear();
         session.CreatureProgress++;
-        session.StatusMessage = "You have given up. Regain all your cards.";
+        
+        // Check if creature reached victory immediately
+        if (session.CreatureProgress >= GameSession.MaxCreatureProgress)
+        {
+            session.IsGameOver = true;
+            session.StatusMessage = "💀 КОНЕЦ ИГРЫ: Вы сдались. Существо вас ассимилировало. Вы поражены.";
+        }
+        else
+        {
+            session.StatusMessage = "You have given up. Regain all your cards.";
+        }
     }
 }

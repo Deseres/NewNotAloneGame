@@ -1,218 +1,156 @@
 using NotAlone.Models;
 using NotAlone.Services;
+using NotAlone.Tests.Helpers;
 using Xunit;
 
 namespace NotAlone.Tests;
 
+/// <summary>
+/// One test per modifier (caught + escaped) going through the full state machine.
+/// Creature location and modifier are set manually so results are deterministic.
+/// </summary>
 public class GameEngineModifierTests
 {
-	private GameSession CreateTestSession()
-	{
-		var session = new GameSession();
-		session.PlayerWillpower = 5;
-		session.CreatureProgress = 0;
-		session.PlayerProgress = 0;
-		session.IsBeaconLit = false;
-		session.AvailableLocations = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-		session.UsedLocations = new List<int>();
-		return session;
-	}
+    private readonly GameEngine _engine = new();
 
-	[Fact]
-	public void DoubleDamage_WhenCaught_DealsExtraDamage()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		var engine = new GameEngine();
-		var initialWillpower = session.PlayerWillpower;
-		session.CurrentModifier = CreatureModifier.DoubleDamage;
+    // ── DoubleDamage ──────────────────────────────────────────────────────────
 
-		// Act - Call actual method
-		var playerChoice = 5;
-		var creatureChoice = 5;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+    [Fact]
+    public void DoubleDamage_WhenCaught_DealsExtraWillpowerDamage()
+    {
+        var session = TestSessionFactory.Create(willpower: 5);
 
-		// Assert
-		Assert.Equal(initialWillpower - 1, session.PlayerWillpower);
-		Assert.Contains("Double Damage", session.StatusMessage);
-	}
+        TestSessionFactory.RunFullRound(_engine, session, 5, 5, CreatureModifier.DoubleDamage);
 
-	[Fact]
-	public void DoubleDamage_WhenEscaped_NoEffect()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		var engine = new GameEngine();
-		var initialWillpower = session.PlayerWillpower;
-		session.CurrentModifier = CreatureModifier.DoubleDamage;
+        // Base catch: -1, DoubleDamage extra: -1 = 3 total
+        Assert.Equal(3, session.PlayerWillpower);
+    }
 
-		// Act - Call actual method with player escaped
-		var playerChoice = 5;
-		var creatureChoice = 3;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+    [Fact]
+    public void DoubleDamage_WhenEscaped_NoExtraDamage()
+    {
+        var session = TestSessionFactory.Create(willpower: 3);
 
-		// Assert
-		Assert.Equal(initialWillpower, session.PlayerWillpower);
-	}
+        TestSessionFactory.RunFullRound(_engine, session, 5, 3, CreatureModifier.DoubleDamage);
 
-	[Fact]
-	public void BlockPlayerProgress_WhenEscaped_BlocksProgress()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		session.PlayerProgress = 2;
-		var initialProgress = session.PlayerProgress;
-		session.CurrentModifier = CreatureModifier.BlockPlayerProgress;
-		var engine = new GameEngine();
+        Assert.Equal(3, session.PlayerWillpower);
+    }
 
-		// Act - Call actual method
-		var playerChoice = 5;
-		var creatureChoice = 3;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+    // ── BlockPlayerProgress ───────────────────────────────────────────────────
 
-		// Assert
-		Assert.Equal(initialProgress - 1, session.PlayerProgress);
-	}
+    [Fact]
+    public void BlockPlayerProgress_WhenEscaped_ProgressNotIncreased()
+    {
+        var session = TestSessionFactory.Create(playerProgress: 0);
 
-	[Fact]
-	public void BlockPlayerProgress_WhenCaught_NoEffect()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		session.PlayerProgress = 2;
-		var initialProgress = session.PlayerProgress;
-		session.CurrentModifier = CreatureModifier.BlockPlayerProgress;
-		var engine = new GameEngine();
+        TestSessionFactory.RunFullRound(_engine, session, 5, 3, CreatureModifier.BlockPlayerProgress);
 
-		// Act - Call actual method
-		var playerChoice = 5;
-		var creatureChoice = 5;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+        Assert.Equal(0, session.PlayerProgress);
+        Assert.Contains("заблокирован", session.StatusMessage);
+    }
 
-		// Assert
-		Assert.Equal(initialProgress, session.PlayerProgress);
-	}
+    [Fact]
+    public void BlockPlayerProgress_WhenCaught_WillpowerStillDecreases()
+    {
+        var session = TestSessionFactory.Create(willpower: 3);
 
-	[Fact]
-	public void BeachAndWreckBlock_Beach_WithBeaconLit_CancelsProgressGain()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		var engine = new GameEngine();
-		session.IsBeaconLit = true;
-		session.PlayerProgress = 1;
-		var initialProgress = session.PlayerProgress;
-		session.CurrentModifier = CreatureModifier.BeachAndWreckBlock;
+        TestSessionFactory.RunFullRound(_engine, session, 5, 5, CreatureModifier.BlockPlayerProgress);
 
-		// Act - Call actual method
-		var playerChoice = 4; // Beach
-		var creatureChoice = 3;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+        Assert.Equal(2, session.PlayerWillpower);
+    }
 
-		// Assert
-		Assert.Equal(initialProgress - 1, session.PlayerProgress);
-	}
+    // ── LoseRandomLocation ────────────────────────────────────────────────────
 
-	[Fact]
-	public void BeachAndWreckBlock_Beach_WithoutBeaconLit_PreventLighting()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		var engine = new GameEngine();
-		session.IsBeaconLit = false;
-		session.CurrentModifier = CreatureModifier.BeachAndWreckBlock;
+    [Fact]
+    public void LoseRandomLocation_WhenCaught_PlayerLosesOneLocation()
+    {
+        var session = TestSessionFactory.Create();
+        var countBeforeRound = session.AvailableLocations.Count - 1; // -1 because PlayRound moves played location
 
-		// Act - Call actual method
-		var playerChoice = 4; // Beach
-		var creatureChoice = 3;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+        TestSessionFactory.RunFullRound(_engine, session, 5, 5, CreatureModifier.LoseRandomLocation);
 
-		// Assert
-		Assert.False(session.IsBeaconLit);
-	}
+        // Modifier removes one more on top of the played location already moved
+        Assert.Equal(countBeforeRound - 1, session.AvailableLocations.Count);
+    }
 
-	[Fact]
-	public void BeachAndWreckBlock_Wreck_CancelsProgressGain()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		var engine = new GameEngine();
-		session.PlayerProgress = 1;
-		var initialProgress = session.PlayerProgress;
-		session.CurrentModifier = CreatureModifier.BeachAndWreckBlock;
+    [Fact]
+    public void LoseRandomLocation_WhenEscaped_StillLosesLocation()
+    {
+        var session = TestSessionFactory.Create();
+        var countBeforeRound = session.AvailableLocations.Count - 1; // -1 for played location
 
-		// Act - Call actual method
-		var playerChoice = 8; // Wreck
-		var creatureChoice = 3;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+        TestSessionFactory.RunFullRound(_engine, session, 5, 3, CreatureModifier.LoseRandomLocation);
 
-		// Assert
-		Assert.Equal(initialProgress - 1, session.PlayerProgress);
-	}
+        // Modifier removes one location even on escape
+        Assert.Equal(countBeforeRound - 1, session.AvailableLocations.Count);
+    }
+    // ── BeachAndWreckBlock ────────────────────────────────────────────────────
 
-	[Fact]
-	public void BeachAndWreckBlock_WhenCaught_NoEffect()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		session.IsBeaconLit = true;
-		session.PlayerProgress = 1;
-		var initialProgress = session.PlayerProgress;
-		var initialBeacon = session.IsBeaconLit;
-		session.CurrentModifier = CreatureModifier.BeachAndWreckBlock;
+    [Fact]
+    public void BeachAndWreckBlock_Beach_SecondVisit_BlocksBeachProgressBonus()
+    {
+        // Beacon already lit so second visit would normally grant +1 progress
+        var session = TestSessionFactory.Create(playerProgress: 0, beaconLit: true);
 
-		// Act - Player caught at Beach
-		var playerChoice = 4;
-		var creatureChoice = 4;
+        TestSessionFactory.RunFullRound(_engine, session, 4, 3, CreatureModifier.BeachAndWreckBlock);
 
-		if (playerChoice != creatureChoice) // This is false, so nothing happens
-		{
-			if (playerChoice == 4)
-			{
-				session.PlayerProgress--;
-			}
-		}
+        // Base escape: +1 progress. Beach bonus blocked → no extra +1
+        Assert.Equal(1, session.PlayerProgress);
+    }
 
-		// Assert
-		Assert.Equal(initialProgress, session.PlayerProgress);
-		Assert.Equal(initialBeacon, session.IsBeaconLit);
-	}
+    [Fact]
+    public void BeachAndWreckBlock_Wreck_BlocksWreckProgressBonus()
+    {
+        var session = TestSessionFactory.Create(playerProgress: 0);
 
-	[Fact]
-	public void ExtraCreatureProgress_WhenCaught_GrantsExtraProgress()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		var engine = new GameEngine();
-		session.CreatureProgress = 0;
-		var initialProgress = session.CreatureProgress;
-		session.CurrentModifier = CreatureModifier.ExtraCreatureProgress;
+        TestSessionFactory.RunFullRound(_engine, session, 8, 3, CreatureModifier.BeachAndWreckBlock);
 
-		// Act - Call actual method
-		var playerChoice = 5;
-		var creatureChoice = 5;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+        // Base escape: +1. Wreck bonus blocked → no extra +1
+        Assert.Equal(1, session.PlayerProgress);
+    }
 
-		// Assert
-		Assert.Equal(initialProgress + 1, session.CreatureProgress);
-	}
+    [Fact]
+    public void BeachAndWreckBlock_WhenCaught_WillpowerDecreases()
+    {
+        var session = TestSessionFactory.Create(willpower: 3, beaconLit: true);
 
-	[Fact]
-	public void ExtraCreatureProgress_WhenEscaped_NoEffect()
-	{
-		// Arrange
-		var session = CreateTestSession();
-		var engine = new GameEngine();
-		session.CreatureProgress = 0;
-		var initialProgress = session.CreatureProgress;
-		session.CurrentModifier = CreatureModifier.ExtraCreatureProgress;
+        TestSessionFactory.RunFullRound(_engine, session, 4, 4, CreatureModifier.BeachAndWreckBlock);
 
-		// Act - Call actual method
-		var playerChoice = 5;
-		var creatureChoice = 3;
-		engine.ApplyCreatureModifier(session, playerChoice, creatureChoice);
+        Assert.Equal(2, session.PlayerWillpower);
+    }
 
-		// Assert
-		Assert.Equal(initialProgress, session.CreatureProgress);
-	}
+    // ── ExtraCreatureProgress ─────────────────────────────────────────────────
+
+    [Fact]
+    public void ExtraCreatureProgress_WhenCaught_GrantsExtraCreatureProgress()
+    {
+        var session = TestSessionFactory.Create();
+
+        TestSessionFactory.RunFullRound(_engine, session, 5, 5, CreatureModifier.ExtraCreatureProgress);
+
+        // Base catch: +1, ExtraCreatureProgress: +1 extra = 2 total
+        Assert.Equal(2, session.CreatureProgress);
+    }
+
+    [Fact]
+    public void ExtraCreatureProgress_WhenEscaped_NoExtraProgress()
+    {
+        var session = TestSessionFactory.Create();
+
+        TestSessionFactory.RunFullRound(_engine, session, 5, 3, CreatureModifier.ExtraCreatureProgress);
+
+        Assert.Equal(0, session.CreatureProgress);
+    }
+
+    // ── None (Artefact disables modifier) ────────────────────────────────────
+
+    [Fact]
+    public void ModifierNone_WhenCaught_OnlyBaseWillpowerLoss()
+    {
+        var session = TestSessionFactory.Create(willpower: 5);
+
+        TestSessionFactory.RunFullRound(_engine, session, 5, 5, CreatureModifier.None);
+
+        Assert.Equal(4, session.PlayerWillpower);
+    }
 }

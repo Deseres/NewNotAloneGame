@@ -223,8 +223,9 @@ public class GameEngine
 			return;
 		}
 
-		// Remember player's selection for later (Result phase)
-		session.LastPlayerChoice = playerLocation;
+		// Remember player's selection for THIS round (CurrentPlayerChoice)
+		// PreviousPlayerChoice will be set after round resolves
+		session.CurrentPlayerChoice = playerLocation;
 
 		// Move played location from available to used for player only
 		session.AvailableLocations.Remove(playerLocation);
@@ -244,8 +245,8 @@ public class GameEngine
 		if (session.CurrentPhase != GamePhase.Result)
 			return;
 
-		// Prepare choices
-		var playerChoice = session.LastPlayerChoice;
+		// Prepare choices - use CurrentPlayerChoice (set this round in Selection phase)
+		var playerChoice = session.CurrentPlayerChoice;
 		var creatureChoice = session.CreatureChosenLocation; // Use deferred creature choice
 
 		// Apply creature modifier FIRST (before progress changes)
@@ -282,24 +283,37 @@ public class GameEngine
 					_tradeService.GiveUp(session);
 					return;
 				}
+
+				// CHECK CREATURE WIN IMMEDIATELY AFTER CATCH
+				if (session.CreatureProgress >= GameSession.MaxCreatureProgress)
+				{
+					session.IsGameOver = true;
+					session.StatusMessage = "💀 КОНЕЦ ИГРЫ: Существо вас ассимилировало. Вы поражены.";
+					return;
+				}
 			}
 			else
 			{
-				// Record trap failure if creature was using trap strategy
-				_creatureLogic?.RecordTrapFailure();
-
-				// Check if progress is entirely blocked by BlockPlayerProgress modifier
-				bool progressBlocked = (session.CurrentModifier == CreatureModifier.BlockPlayerProgress);
+				// ESCAPED: Only grant progress on successful escape
+				// Progress blocked by BlockPlayerProgress modifier OR if location is blocked by creature
+				bool progressBlocked = (session.CurrentModifier == CreatureModifier.BlockPlayerProgress) 
+									|| isLocationBlocked;
 				
 				if (!progressBlocked)
 				{
 					session.PlayerProgress++;
 				}
+
+				// Record escape so creature AI can decay abuse detection and update attempt history
+				if (creatureChoice.HasValue)
+					_creatureLogic?.RecordEscape(creatureChoice.Value);
 				
 				session.StatusMessage = $"[Result] ✓ СПАСЛИСЬ! Вы в локации {playerChoice}, Существо в {creatureChoice}. " +
 					$"Прогресс спасения: {session.PlayerProgress}/{GameSession.MaxPlayerProgress}.";
 				
-				if (progressBlocked)
+				if (isLocationBlocked)
+					session.StatusMessage += " Но Существо заблокировало вашу локацию, полностью останавливая прогресс!";
+				else if (session.CurrentModifier == CreatureModifier.BlockPlayerProgress)
 					session.StatusMessage += " Но весь Ваш прогресс был заблокирован модификатором!";
 				else if (session.CurrentModifier == CreatureModifier.BeachAndWreckBlock && (playerChoice == 4 || playerChoice == 8))
 					session.StatusMessage += " Но дополнительный эффект локации был заблокирован!";
@@ -311,19 +325,6 @@ public class GameEngine
 				}
 			}
 
-			// Victory Check after comparison
-			if (session.CreatureProgress >= GameSession.MaxCreatureProgress)
-			{
-				session.IsGameOver = true;
-				session.StatusMessage = "💀 КОНЕЦ ИГРЫ: Существо вас ассимилировало. Вы поражены.";
-				return;
-			}
-			else if (session.PlayerProgress >= GameSession.MaxPlayerProgress)
-			{
-				session.IsGameOver = true;
-				session.StatusMessage = "🚀 КОНЕЦ ИГРЫ: Спасение прибыло! Вы сбежали из Артемии!";
-				return;
-			}
 		}
 
 		// Flag to indicate whether the player's played card should return to hand (available)
@@ -512,10 +513,22 @@ public class GameEngine
 			session.IsFogActive = false;
 			session.StatusMessage += " Туман рассеялся и больше не активен.";
 		}
-		if (session.IsArtefactActive)
+		
+		// Deactivate artefact ONLY if it was NOT just activated this round (i.e., it's from a previous round)
+		// If player just used location 10, keep IsArtefactActive = true for next round's creature to see it
+		bool justUsedArtefact = playerChoice.HasValue && playerChoice.Value == 10;
+		if (session.IsArtefactActive && !justUsedArtefact)
 		{
 			session.IsArtefactActive = false;
 			session.StatusMessage += " Артефакт использован и деактивирован.";
+		}
+
+		// Check player win AFTER all effects (location effects, modifiers, etc.) are applied
+		// Creature win is already checked immediately after catch, so this only triggers on escape
+		if (session.PlayerProgress >= GameSession.MaxPlayerProgress)
+		{
+			session.IsGameOver = true;
+			session.StatusMessage = "🚀 КОНЕЦ ИГРЫ: Спасение прибыло! Вы сбежали из Артемии!";
 		}
 	}
 
