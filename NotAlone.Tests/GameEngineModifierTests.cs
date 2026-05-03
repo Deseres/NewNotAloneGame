@@ -46,7 +46,7 @@ public class GameEngineModifierTests
         TestSessionFactory.RunFullRound(_engine, session, 5, 3, CreatureModifier.BlockPlayerProgress);
 
         Assert.Equal(0, session.PlayerProgress);
-        Assert.Contains("заблокирован", session.StatusMessage);
+        Assert.Contains("blocked", session.StatusMessage);
     }
 
     [Fact]

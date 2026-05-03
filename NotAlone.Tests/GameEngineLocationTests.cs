@@ -157,7 +157,7 @@ public class GameEngineLocationTests
 
         // Artefact activates and is then consumed at end of round — IsArtefactActive resets to false
         // The flag was set and cleared within the same round; check the status message instead
-        Assert.Contains("Артефакт", session.StatusMessage);
+        Assert.Contains("Artefact", session.StatusMessage);
     }
 
     // ── Lair (1) ──────────────────────────────────────────────────────────────

@@ -1,0 +1,4 @@
+; Deployment file for Azure App Service
+; Use custom deployment to handle path limitations
+[config]
+command = deploy.cmd

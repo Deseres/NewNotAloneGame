@@ -27,7 +27,7 @@ public class GameController : ControllerBase
     {
         var session = await _store.GetSessionAsync(id);
         if (session is null)
-            return NotFound(new { error = "❌ Игровая сессия не найдена." });
+            return NotFound(new { error = "❌ Game session not found." });
         
         return Ok(new { session = session });
     }
@@ -38,7 +38,7 @@ public class GameController : ControllerBase
         var session = new GameSession();
         int randomCard = Random.Shared.Next(1, 6);
         session.AvailableSurvivalCards = new List<int> { randomCard };
-        session.StatusMessage = "🎮 Игра началась! Выживание маловероятно. Выберите локацию для начала.";
+        session.StatusMessage = "🎮 Game started! Survival is unlikely. Choose a location to begin.";
 
         _creatureLogic.ResetHistory();  
 
@@ -52,13 +52,13 @@ public class GameController : ControllerBase
     {
         var session = await _store.GetSessionAsync(id);
         if (session == null)
-            return NotFound(new { error = "❌ Игровая сессия не найдена." });
+            return NotFound(new { error = "❌ Game session not found." });
 
         if (session.IsGameOver)
-            return BadRequest(new { error = "❌ Игра уже завершена." });
+            return BadRequest(new { error = "❌ The game is already over." });
 
         if (session.CurrentPhase != GamePhase.Selection)
-            return BadRequest(new { error = $"❌ Выбор локации допускается только в фазе Selection. Текущая фаза: {session.CurrentPhase}." });
+            return BadRequest(new { error = $"❌ Location selection is only allowed during the Selection phase. Current phase: {session.CurrentPhase}." });
 
         _engine.PlayRound(session, playerLocation);
 
@@ -74,15 +74,26 @@ public class GameController : ControllerBase
     {
         var session = await _store.GetSessionAsync(id);
         if (session == null)
-            return NotFound(new { error = "❌ Игровая сессия не найдена." });
+            return NotFound(new { error = "❌ Game session not found." });
 
         if (session.IsGameOver)
-            return BadRequest(new { error = "❌ Игра уже завершена." });
+            return BadRequest(new { error = "❌ The game is already over." });
 
         if (session.CurrentPhase != GamePhase.CreatureTurn)
-            return BadRequest(new { error = $"❌ Выбор Существа допускается только в фазе CreatureTurn. Текущая фаза: {session.CurrentPhase}." });
+            return BadRequest(new { error = $"❌ Creature turn is only allowed during the CreatureTurn phase. Current phase: {session.CurrentPhase}." });
 
-        _creatureLogic.SelectCreatureLocation(session);
+        // If River Vision already pre-committed the creature's choice, skip re-selection
+        if (!session.IsRiverVisionRevealed)
+        {
+            _creatureLogic.SelectCreatureLocation(session);
+        }
+        else
+        {
+            var rvBlockInfo = session.CreatureBlockingLocation.HasValue
+                ? $" Blocking location: {session.CreatureBlockingLocation}."
+                : string.Empty;
+            session.StatusMessage = $"[CreatureTurn] 👁️ The Creature already made its move (revealed by River Vision). Attacking location: {session.CreatureChosenLocation}.{rvBlockInfo} Modifier: {ReadableModifier(session.CurrentModifier)}.";
+        }
 
         // move to Result phase
         session.CurrentPhase = GamePhase.Result;
@@ -96,13 +107,13 @@ public class GameController : ControllerBase
     {
         var session = await _store.GetSessionAsync(id);
         if (session == null)
-            return NotFound(new { error = "❌ Игровая сессия не найдена." });
+            return NotFound(new { error = "❌ Game session not found." });
 
         if (session.IsGameOver)
-            return BadRequest(new { error = "❌ Игра уже завершена." });
+            return BadRequest(new { error = "❌ The game is already over." });
 
         if (session.CurrentPhase != GamePhase.Result)
-            return BadRequest(new { error = $"❌ Переход к следующему раунду допускается только в фазе Result. Текущая фаза: {session.CurrentPhase}." });
+            return BadRequest(new { error = $"❌ Advancing to the next round is only allowed during the Result phase. Current phase: {session.CurrentPhase}." });
 
         // First, run result-phase effects (special locations, card effects)
         _engine.ResolveRound(session);
@@ -129,41 +140,34 @@ public class GameController : ControllerBase
         session.PreviousPlayerChoice = session.CurrentPlayerChoice;
         session.PreviousCreatureChoice = session.CreatureChosenLocation;
 
-        // If river vision is active, pre-generate the Creature's move for next round
+        // If river vision is active, pre-commit the Creature's move BEFORE the player picks
         if (session.IsRiverVisionActive && !session.IsRiverVisionRevealed)
         {
-            if (session.AvailableLocations.Count > 0)
-            {
-                // Build candidates for River Vision pre-choice: only AvailableLocations (no LastPlayerChoice)
-                // LastPlayerChoice was already processed in current round and moved to UsedLocations
-                var riverVisionCandidates = new List<int>(session.AvailableLocations);
+            // Creature picks blind — it doesn't know where the player will go next round
+            session.CurrentPlayerChoice = null;
 
-                // If second phase active, predict and exclude the blocking location
-                int? predictedBlockingLocation = null;
-                if (session.PlayerProgress >= 4 && riverVisionCandidates.Count > 1)
-                {
-                    // Simulate blocking location selection (random from candidates)
-                    // In real game creature AI will pick strategically, but for River Vision we use random
-                    predictedBlockingLocation = riverVisionCandidates[Random.Shared.Next(riverVisionCandidates.Count)];
-                    riverVisionCandidates.Remove(predictedBlockingLocation.Value);
-                }
+            // Use the real creature AI to commit — this is the actual move the creature will make
+            _creatureLogic.SelectCreatureLocation(session);
+            session.IsRiverVisionRevealed = true;
 
-                // Now pick River Vision choice from remaining candidates
-                if (riverVisionCandidates.Count > 0)
-                {
-                    var idx = Random.Shared.Next(riverVisionCandidates.Count);
-                    var preChoice = riverVisionCandidates[idx];
-                    session.PreviousCreatureChoice = preChoice;
-                    session.IsRiverVisionRevealed = true;
-                    session.StatusMessage = $"[NextRound] 👁️ Видение реки активно: Существо пойдёт на локацию {preChoice}. Выберите вашу локацию.";
-                    await _store.UpdateSessionAsync(session);
-                    return Ok(new { message = session.StatusMessage, session = session });
-                }
-            }
+            session.StatusMessage = $"[NextRound] 👁️ River Vision is active: the Creature will attack location {session.CreatureChosenLocation}. Now choose your location.";
+            await _store.UpdateSessionAsync(session);
+            return Ok(new { message = session.StatusMessage, session = session });
         }
 
-        session.StatusMessage = "[NextRound] ▶️ Новый раунд начался. Выберите вашу локацию.";
+        session.StatusMessage = "[NextRound] ▶️ New round started. Choose your location.";
         await _store.UpdateSessionAsync(session);
         return Ok(new { message = session.StatusMessage, session = session });
     }
+
+    private static string ReadableModifier(CreatureModifier modifier) => modifier switch
+    {
+        CreatureModifier.None                  => "None",
+        CreatureModifier.DoubleDamage          => "Double Damage",
+        CreatureModifier.BlockPlayerProgress   => "Block Progress",
+        CreatureModifier.LoseRandomLocation    => "Lose Location",
+        CreatureModifier.BeachAndWreckBlock    => "Beach & Wreck Block",
+        CreatureModifier.ExtraCreatureProgress => "Extra Creature Progress",
+        _                                      => modifier.ToString()
+    };
 }

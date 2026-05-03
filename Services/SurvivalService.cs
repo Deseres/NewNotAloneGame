@@ -66,18 +66,18 @@ public class SurvivalService
 
             // If target locations are specified, validate them
             if (targetLocationIds.Count > 2)
-                return (false, "❌ LocationsRegen может восстановить максимум 2 локации.");
+                return (false, "❌ LocationsRegen can restore at most 2 locations.");
 
             // Check if all target locations exist in UsedLocations
             foreach (var locId in targetLocationIds)
             {
                 if (!session.UsedLocations.Contains(locId))
-                    return (false, $"❌ Локация {locId} не в использованных и не может быть восстановлена.");
+                    return (false, $"❌ Location {locId} is not in used locations and cannot be restored.");
             }
 
             // Check for duplicates
             if (targetLocationIds.Distinct().Count() != targetLocationIds.Count)
-                return (false, "❌ Целевые локации должны быть уникальными.");
+                return (false, "❌ Target locations must be unique.");
 
             return (true, string.Empty);
         }
@@ -94,12 +94,12 @@ public class SurvivalService
         {
             case SurvivalCardType.Heal:
                 session.PlayerWillpower = Math.Min(session.PlayerWillpower + 1, 3);
-                session.StatusMessage = $"[Card: Heal] 💪 Вы восстановили 1 волю. Текущее значение: {session.PlayerWillpower}/3.";
+                session.StatusMessage = $"[Card: Heal] 💪 You restored 1 willpower. Current: {session.PlayerWillpower}/3.";
                 break;
 
             case SurvivalCardType.Beacon:
                 session.IsBeaconLit = true;
-                session.StatusMessage = $"[Card: Beacon] 🔥 Маяк на локации 4 зажжён! Он привлечёт спасение или Существо?";
+                session.StatusMessage = $"[Card: Beacon] 🔥 Beacon at location 4 is lit! Will it attract rescue or the Creature?";
                 break;
 
             case SurvivalCardType.LocationsRegen:
@@ -112,7 +112,7 @@ public class SurvivalService
 
             case SurvivalCardType.Fog:
                 session.IsFogActive = true;
-                session.StatusMessage = $"[Card: Fog] 🌫️ Туман активирован! Существо будет выбирать из всех локаций.";
+                session.StatusMessage = $"[Card: Fog] 🌫️ Fog activated! The Creature will choose from all locations.";
                 break;
         }
     }
@@ -122,7 +122,7 @@ public class SurvivalService
         if (session == null || session.CreatureChosenLocation == null || direction == null)
         {
             if (session != null)
-                session.StatusMessage = "[Card: MoveTarget] ❌ Ошибка: направление не указано или Существо ещё не выбрало локацию.";
+                session.StatusMessage = "[Card: MoveTarget] ❌ Error: direction not specified or the Creature has not yet chosen a location.";
             return;
         }
 
@@ -132,15 +132,15 @@ public class SurvivalService
         // Validate bounds [1, 10]
         if (newLocation < 1 || newLocation > 10)
         {
-            session.StatusMessage = $"[Card: MoveTarget] ❌ Локация {newLocation} вне границ карты [1-10]. " +
-                $"Существо остаётся на {currentLocation}.";
+            session.StatusMessage = $"[Card: MoveTarget] ❌ Location {newLocation} is out of bounds [1-10]. " +
+                $"The Creature stays at {currentLocation}.";
             return;
         }
 
         session.CreatureChosenLocation = newLocation;
-        string directionName = direction == CardDirection.Left ? "ВЛЕВО" : "ВПРАВО";
-        session.StatusMessage = $"[Card: MoveTarget] 🎯 Существо передвинулось {directionName}: " +
-            $"{currentLocation} → {newLocation}. Это может спасти вас в Result фазе!";
+        string directionName = direction == CardDirection.Left ? "LEFT" : "RIGHT";
+        session.StatusMessage = $"[Card: MoveTarget] 🎯 The Creature moved {directionName}: " +
+            $"{currentLocation} → {newLocation}. This may save you in the Result phase!";
     }
 
     private void ApplyLocationsRegenEffect(GameSession session, List<int>? targetLocationIds)
@@ -174,12 +174,12 @@ public class SurvivalService
         if (restoredLocations.Count > 0)
         {
             var locationsStr = string.Join(", ", restoredLocations);
-            session.StatusMessage = $"[Card: LocationsRegen] 🌱 Восстановлены локации: {locationsStr}. " +
-                $"Доступные ({session.AvailableLocations.Count}): {string.Join(", ", session.AvailableLocations)}";
+            session.StatusMessage = $"[Card: LocationsRegen] 🌱 Restored locations: {locationsStr}. " +
+                $"Available ({session.AvailableLocations.Count}): {string.Join(", ", session.AvailableLocations)}";
         }
         else
         {
-            session.StatusMessage = "[Card: LocationsRegen] ℹ️ Нет использованных локаций для восстановления.";
+            session.StatusMessage = "[Card: LocationsRegen] ℹ️ No used locations available to restore.";
         }
     }
 }

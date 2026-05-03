@@ -6,10 +6,26 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <!-- Fix for Azure App Service long path issue (260 char limit) -->
+    <SelfContained>false</SelfContained>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <!-- Don't include platform-specific runtime files -->
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="NotAlone.Tests/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="NotAlone.Tests/**" />
+    <Folder Remove="NotAlone.Tests/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Exclude test artifacts and deep nested paths from publish -->
+    <None Remove="NotAlone.Tests\**" />
   </ItemGroup>
 
   <ItemGroup>

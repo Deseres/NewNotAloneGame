@@ -5,6 +5,17 @@ applyTo: '**/*.cs'
 
 # NotAlone Game - AI Development Guide
 
+# MCP Server tools
+# Context7 (Docs): 
+When asked about third-party libraries, frameworks, or APIs, always prioritize searching live documentation using io.github.upstash/context7 before relying on internal knowledge.
+# Sequential Thinking (Reasoning): 
+For complex architectural tasks, multi-step debugging, or logic puzzles, use the sequential-thinking tool to map out a reasoning chain before providing the final code.
+# Playwright (Web): 
+Use the playwright tool to inspect live websites, verify UI elements, or troubleshoot CSS/DOM issues by navigating to the relevant URL. Always confirm if a local server (e.g., localhost) needs to be running.
+
+Tool Transparency: If a tool requires a specific input (like a Library ID or a URL) that isn't clear from the prompt, ask for clarification instead of guessing.
+
+
 ## Project Overview
 
 **NotAlone** is a .NET 10 strategic survival game. Players (progress target: 7) choose locations to survive while a creature (progress target: 5) with strategic AI tries to catch them. Stack: ASP.NET Core Web API + EF Core (SQLite/SQL Server) + React/TypeScript frontend served as SPA from `wwwroot/`.
@@ -20,7 +31,7 @@ Win/loss: `PlayerProgress >= MaxPlayerProgress (7)` = player wins; `CreatureProg
 | Phase | API endpoint | What happens |
 |---|---|---|
 | Selection | `POST /api/game/{id}/play` | Player picks location from `AvailableLocations`; location moved to `UsedLocations`; `CurrentPlayerChoice` set |
-| CreatureTurn | `POST /api/game/{id}/creature-turn` | `CreatureLogic` sets `CreatureChosenLocation` (and `CreatureBlockingLocation` when `PlayerProgress >= 4`) |
+| CreatureTurn | `POST /api/game/{id}/creature-turn` | `CreatureLogic` sets `CreatureChosenLocation` (and `CreatureBlockingLocation` when `PlayerProgress >= 0`) |
 | Result | `POST /api/game/{id}/next-round` | `ResolveRound()` runs; effects applied; `PreviousPlayerChoice` and `PreviousCreatureChoice` updated for next round's creature learning; history saved if game over |
 
 **Always guard with phase checks**: `if (session.CurrentPhase != GamePhase.Selection) return BadRequest(...)`.
@@ -39,9 +50,9 @@ Win/loss: `PlayerProgress >= MaxPlayerProgress (7)` = player wins; `CreatureProg
 | 9 | Source | Restores 1 willpower |
 | 10 | Artefact | Sets `IsArtefactActive = true` → disables `CurrentModifier` AND `CreatureBlockingLocation` next round |
 
-## Second-Phase Blocking (PlayerProgress ≥ 4)
+## Second-Phase Blocking (PlayerProgress ≥ 0)
 
-When `PlayerProgress >= 4`, creature selects **two** locations:
+When `PlayerProgress >= 0`, creature selects **two** locations:
 1. `CreatureBlockingLocation` — chosen FIRST from `AvailableLocations + CurrentPlayerChoice`; negates that location's effect
 2. `CreatureChosenLocation` — chosen SECOND from remaining candidates; determines if caught
 
@@ -70,12 +81,6 @@ Modifiers apply to `CreatureChosenLocation` (attack) only, never to `CreatureBlo
 - `ExtraCreatureProgress` — creature gains +2 progress on catch
 - `None` — special: disables Artefact protection AND blocking negation
 
-## Creature AI (`CreatureLogic.cs`)
-
-Three mixed strategies tracked via success rates:
-1. **Trap** — targets beach/wreck locations (1, 3, 8) with `BeachAndWreckBlock`
-2. **Interception** — predicts player's next location from `_playerLocationHistory`
-3. **Exploitation** — if same location used 3+ times in last 5 rounds (`_singleLocationObsessionThreshold`), prioritizes it
 
 `DetermineOptimalCreatureLocation(session, modifier, candidateLocations)` scores only the **passed `candidateLocations`**, never `session.AvailableLocations` directly.
 

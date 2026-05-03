@@ -86,7 +86,7 @@ public class GameEngineRoundTests
         TestSessionFactory.RunFullRound(_engine, session, playerLocation: 5, creatureLocation: 5);
 
         Assert.True(session.IsGameOver);
-        Assert.Contains("ассимилировало", session.StatusMessage);
+        Assert.Contains("assimilated", session.StatusMessage);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class GameEngineRoundTests
         TestSessionFactory.RunFullRound(_engine, session, playerLocation: 5, creatureLocation: 3);
 
         Assert.True(session.IsGameOver);
-        Assert.Contains("Спасение прибыло", session.StatusMessage);
+        Assert.Contains("Rescue has arrived", session.StatusMessage);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public class GameEngineRoundTests
         _engine.PlayRound(session, 9);
 
         Assert.DoesNotContain(9, session.UsedLocations);
-        Assert.Contains("недоступна", session.StatusMessage);
+        Assert.Contains("unavailable", session.StatusMessage);
     }
 
     [Fact]

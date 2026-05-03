@@ -33,11 +33,11 @@ public class GameEngine
 			session.UsedLocations.Remove(toRestore);
 			if (!session.AvailableLocations.Contains(toRestore))
 				session.AvailableLocations.Add(toRestore);
-			return (true, $"Джунгли восстановили {toRestore}.");
+			return (true, $"Jungle restored location {toRestore}.");
 		}
 
 		// preserve flag still true (player's card preserved), but no card restored
-		return (true, "Джунгли не нашли использованных карт для восстановления.");
+		return (true, "Jungle found no used locations to restore.");
 	}
 
 	private (bool shouldPreserve, string message) ApplySwampEffect(GameSession session, int currentCardId)
@@ -60,8 +60,8 @@ public class GameEngine
 		}
 
 		var msg = restored > 0 
-			? $"Болото восстановило {restored} карт."
-			: "Болото не нашли использованных карт для восстановления.";
+			? $"Swamp restored {restored} location(s)."
+			: "Swamp found no used locations to restore.";
 		
 		return (true, msg);
 	}
@@ -78,7 +78,7 @@ public class GameEngine
 		
 		session.AvailableSurvivalCards.Add(cardId);
 		
-		return (true, $"Убежище предоставило вам карту выживания: {randomCardType}.");
+		return (true, $"Shelter provided you a survival card: {randomCardType}.");
 	}
 
 	// Helper: apply River effect (enable river vision for next round)
@@ -87,7 +87,7 @@ public class GameEngine
 		if (session == null) return string.Empty;
 		session.IsRiverVisionActive = true;
 		session.IsRiverVisionRevealed = false;
-		return "Видение реки активно: в следующем раунде ход Существо будет виден.";
+		return "River Vision active: in the next round the Creature's move will be revealed.";
 	}
 
 	// Helper: apply Rover effect (unlock one blocked location)
@@ -101,9 +101,9 @@ public class GameEngine
 			var unlocked = blocked[idx3];
 			if (!session.AvailableLocations.Contains(unlocked))
 				session.AvailableLocations.Add(unlocked);
-			return $"Вездеход исследовал территорию и открыл локацию {unlocked}.";
+			return $"Rover explored the territory and unlocked location {unlocked}.";
 		}
-		return "Вездеход вернул ценные данные, но все локации уже разблокированы.";
+		return "Rover returned valuable data, but all locations are already unlocked.";
 	}
 
 	// Helper: apply Beach effect for a player (light beacon or grant progress)
@@ -114,7 +114,7 @@ public class GameEngine
 		if (!session.IsBeaconLit)
 		{
 			session.IsBeaconLit = true;
-			return "Вы зажгли маяк на 4.";
+			return "You lit the beacon at location 4.";
 		}
 		else
 		{
@@ -122,11 +122,11 @@ public class GameEngine
 			if (!blockProgress)
 			{
 				session.PlayerProgress++;
-				return "Маяк на 4 помог вашему спасению (+1 прогресс).";
+				return "The beacon at location 4 aided your rescue (+1 progress).";
 			}
 			else
 			{
-				return "Маяк освещает ваш путь, но Существо перекрывает весь прогресс.";
+				return "The beacon lights your way, but the Creature is blocking all your progress.";
 			}
 		}
 	}
@@ -136,7 +136,7 @@ public class GameEngine
 	{
 		if (session == null) return string.Empty;
 		session.PlayerProgress++;
-		return "Обломки помогли вашему спасению (+1 прогресс).";
+		return "The Wreck aided your rescue (+1 progress).";
 	}
 
 	// Helper: apply Source effect (restores willpower)
@@ -146,9 +146,9 @@ public class GameEngine
 		if (session.PlayerWillpower < GameSession.MaxWillpower)
 		{
 			session.PlayerWillpower++;
-			return "Источник восстановил вашу волю (+1 воля).";
+			return "The Source restored your willpower (+1 willpower).";
 		}
-		return "Источник не нашёл нужной вам помощи (воля уже максимальна).";
+		return "The Source found nothing to offer — willpower is already at maximum.";
 	}
 
 	// Helper: apply Artefact effect (disables creature power)
@@ -156,7 +156,7 @@ public class GameEngine
 	{
 		if (session == null) return string.Empty;
 		session.IsArtefactActive = true;
-		return "Артефакт активирован: сила Существа будет нейтрализована в следующем раунде.";
+		return "Artefact activated: the Creature's power will be neutralised next round.";
 	}
 
 	// Helper: apply creature modifier effects
@@ -171,13 +171,13 @@ public class GameEngine
 				if (playerChoice == creatureChoice)
 				{
 					session.PlayerWillpower = Math.Max(0, session.PlayerWillpower - 1);
-					session.StatusMessage += $"\n⚠️ [Modifier: Double Damage] Существо наносит дополнительный урон!";
+					session.StatusMessage += $"\n⚠️ [Modifier: Double Damage] The Creature deals extra damage!";
 				}
 				break;
 
 			case CreatureModifier.BlockPlayerProgress:
 				// Blocks ALL progress on escape (handled in ResolveRound)
-				session.StatusMessage += $"\n⚠️ [Modifier: Block Progress] Весь Ваш прогресс спасения был заблокирован!";
+				session.StatusMessage += $"\n⚠️ [Modifier: Block Progress] All your rescue progress was blocked!";
 				break;
 
 			case CreatureModifier.LoseRandomLocation:
@@ -187,7 +187,7 @@ public class GameEngine
 					var lost = session.AvailableLocations[idx];
 					session.AvailableLocations.RemoveAt(idx);
 					session.UsedLocations.Add(lost);
-					session.StatusMessage += $"\n⚠️ [Modifier: Lose Location] Вы потеряли локацию {lost}!";
+					session.StatusMessage += $"\n⚠️ [Modifier: Lose Location] You lost location {lost}!";
 				}
 				break;
 			case CreatureModifier.BeachAndWreckBlock:
@@ -195,11 +195,11 @@ public class GameEngine
 				{
 					if (playerChoice == 4) // Beach
 					{
-						session.StatusMessage += $"\n⚠️ [Modifier: Beach Block] Дополнительный эффект Пляжа заблокирован!";
+						session.StatusMessage += $"\n⚠️ [Modifier: Beach Block] The Beach bonus effect was blocked!";
 					}
 					else if (playerChoice == 8) // Wreck
 					{
-						session.StatusMessage += $"\n⚠️ [Modifier: Wreck Block] Дополнительный прогресс от Обломков заблокирован!";
+						session.StatusMessage += $"\n⚠️ [Modifier: Wreck Block] The Wreck bonus progress was blocked!";
 					}
 				}
 				break;
@@ -207,7 +207,7 @@ public class GameEngine
 					if (playerChoice == creatureChoice)
 					{
 						session.CreatureProgress = Math.Min(GameSession.MaxCreatureProgress, session.CreatureProgress + 1);
-						session.StatusMessage += $"\n⚠️ [Modifier: Extra Creature Progress] Существо продвигается быстрее!";
+						session.StatusMessage += $"\n⚠️ [Modifier: Extra Creature Progress] The Creature advances faster!";
 					}
 					break;
 		}
@@ -219,7 +219,7 @@ public class GameEngine
 		// Only allow player to pick from available locations
 		if (!session.AvailableLocations.Contains(playerLocation))
 		{
-			session.StatusMessage = $"[Selection] ❌ Локация {playerLocation} недоступна. Доступные: {string.Join(", ", session.AvailableLocations)}";
+			session.StatusMessage = $"[Selection] ❌ Location {playerLocation} is unavailable. Available: {string.Join(", ", session.AvailableLocations)}";
 			return;
 		}
 
@@ -231,7 +231,7 @@ public class GameEngine
 		session.AvailableLocations.Remove(playerLocation);
 		session.UsedLocations.Add(playerLocation);
 
-		session.StatusMessage = $"[Selection] ✓ Вы выбрали локацию {playerLocation}. Ожидание выбора Существа...";
+		session.StatusMessage = $"[Selection] ✓ You chose location {playerLocation}. Waiting for the Creature...";
 	}
 
 
@@ -273,9 +273,9 @@ public class GameEngine
 
 				session.PlayerWillpower--;
 				session.CreatureProgress++;
-				session.StatusMessage = $"[Result] ⚠️ ПОЙМАЛИ! И Вы, и Существо выбрали локацию {creatureChoice}. " +
-					$"Потеряна 1 воля (осталось {session.PlayerWillpower}). " +
-					$"Существо: {session.CreatureProgress}/{GameSession.MaxCreatureProgress} к ассимиляции.";
+				session.StatusMessage = $"[Result] ⚠️ CAUGHT! Both you and the Creature chose location {creatureChoice}. " +
+					$"Lost 1 willpower (remaining: {session.PlayerWillpower}). " +
+					$"Creature: {session.CreatureProgress}/{GameSession.MaxCreatureProgress} to assimilation.";
 
 				// If willpower drops to zero or below, immediately give up
 				if (session.PlayerWillpower <= 0)
@@ -288,7 +288,7 @@ public class GameEngine
 				if (session.CreatureProgress >= GameSession.MaxCreatureProgress)
 				{
 					session.IsGameOver = true;
-					session.StatusMessage = "💀 КОНЕЦ ИГРЫ: Существо вас ассимилировало. Вы поражены.";
+					session.StatusMessage = "💀 GAME OVER: The Creature has assimilated you. Defeat.";
 					return;
 				}
 			}
@@ -308,21 +308,15 @@ public class GameEngine
 				if (creatureChoice.HasValue)
 					_creatureLogic?.RecordEscape(creatureChoice.Value);
 				
-				session.StatusMessage = $"[Result] ✓ СПАСЛИСЬ! Вы в локации {playerChoice}, Существо в {creatureChoice}. " +
-					$"Прогресс спасения: {session.PlayerProgress}/{GameSession.MaxPlayerProgress}.";
+				session.StatusMessage = $"[Result] ✓ ESCAPED! You are at location {playerChoice}, the Creature at {creatureChoice}. " +
+					$"Rescue progress: {session.PlayerProgress}/{GameSession.MaxPlayerProgress}.";
 				
 				if (isLocationBlocked)
-					session.StatusMessage += " Но Существо заблокировало вашу локацию, полностью останавливая прогресс!";
+					session.StatusMessage += " But the Creature blocked your location, stopping all progress!";
 				else if (session.CurrentModifier == CreatureModifier.BlockPlayerProgress)
-					session.StatusMessage += " Но весь Ваш прогресс был заблокирован модификатором!";
+					session.StatusMessage += " But all your progress was blocked by the modifier!";
 				else if (session.CurrentModifier == CreatureModifier.BeachAndWreckBlock && (playerChoice == 4 || playerChoice == 8))
-					session.StatusMessage += " Но дополнительный эффект локации был заблокирован!";
-				
-				// SECOND PHASE: Check if location effects are blocked
-				if (isLocationBlocked)
-				{
-					session.StatusMessage += $" ⚠️ Эффект локации {playerChoice} был заблокирован вторым выбором Существа!";
-				}
+					session.StatusMessage += " But the location's bonus effect was blocked!";
 			}
 
 		}
@@ -334,7 +328,7 @@ public class GameEngine
 		if (creatureChoice.HasValue && creatureChoice.Value == 4)
 		{
 			session.IsBeaconLit = false;
-			session.StatusMessage += " Существо потушило маяк на 4.";
+			session.StatusMessage += " The Creature extinguished the beacon at location 4.";
 		}
 
 		// Handle caught cases first
@@ -344,7 +338,7 @@ public class GameEngine
 			{
 				// Lair caught: extra willpower loss
 				session.PlayerWillpower--;
-				session.StatusMessage = "Вы зашли в самое Логово Существа! Это была ошибка. Потеряно 2 воли";
+				session.StatusMessage += " You walked straight into the Creature's Lair! An extra willpower lost.";
 				if (session.PlayerWillpower <= 0)
 				{
 					_tradeService.GiveUp(session);
@@ -477,9 +471,9 @@ public class GameEngine
 							effectMsg = ApplyArtefactEffect(session);
 						}
 						else
-							effectMsg = $"Эффект локации {cc} не реализован для копирования.";
+							effectMsg = $"The effect of location {cc} is not implemented for copying.";
 						
-						session.StatusMessage = $"Пока Существо охотилось в другом месте, вы обыскали его Логово и использовали возможности локации {cc}. {effectMsg}";
+						session.StatusMessage = $"While the Creature hunted elsewhere, you searched its Lair and used the powers of location {cc}. {effectMsg}";
 					}
 				}
 			}
@@ -495,7 +489,7 @@ public class GameEngine
 				session.UsedLocations.Remove(pl);
 				if (!session.AvailableLocations.Contains(pl))
 					session.AvailableLocations.Add(pl);
-				session.StatusMessage += $" Карта {pl} возвращена в руку благодаря эффекту.";
+				session.StatusMessage += $" Location {pl} returned to your hand via its effect.";
 			}
 		}
 
@@ -506,12 +500,12 @@ public class GameEngine
 		{
 			session.IsRiverVisionActive = false;
 			session.IsRiverVisionRevealed = false;
-			session.StatusMessage += " Видение реки использовано и больше не активно.";
+			session.StatusMessage += " River Vision has been used and is no longer active.";
 		}
 		if (session.IsFogActive)
 		{
 			session.IsFogActive = false;
-			session.StatusMessage += " Туман рассеялся и больше не активен.";
+			session.StatusMessage += " The fog has lifted and is no longer active.";
 		}
 		
 		// Deactivate artefact ONLY if it was NOT just activated this round (i.e., it's from a previous round)
@@ -520,7 +514,7 @@ public class GameEngine
 		if (session.IsArtefactActive && !justUsedArtefact)
 		{
 			session.IsArtefactActive = false;
-			session.StatusMessage += " Артефакт использован и деактивирован.";
+			session.StatusMessage += " Artefact has been used and deactivated.";
 		}
 
 		// Check player win AFTER all effects (location effects, modifiers, etc.) are applied
@@ -528,7 +522,7 @@ public class GameEngine
 		if (session.PlayerProgress >= GameSession.MaxPlayerProgress)
 		{
 			session.IsGameOver = true;
-			session.StatusMessage = "🚀 КОНЕЦ ИГРЫ: Спасение прибыло! Вы сбежали из Артемии!";
+			session.StatusMessage = "🚀 GAME OVER: Rescue has arrived! You escaped from Artemia!";
 		}
 	}
 

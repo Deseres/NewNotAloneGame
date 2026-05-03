@@ -26,13 +26,11 @@ public class TradeService
         if (givenWillpower == 1)
         {
             session.PlayerWillpower--;
-            session.StatusMessage = "You resisted with 1 willpower, but the Creature is getting stronger.";
-        }
+            session.StatusMessage = $"[Selection] You restored {chosenLocations.Length} location(s) by giving 1 willpower (remaining: {session.PlayerWillpower}/{GameSession.MaxWillpower}).";        }
         else // givenWillpower == 2
         {
             session.PlayerWillpower -= 2;
-            session.StatusMessage = "You resisted with 2 willpower, but the Creature is rapidly assimilating you.";
-        }
+            session.StatusMessage = $"[Selection] You restored {chosenLocations.Length} location(s) by giving 2 willpower (remaining: {session.PlayerWillpower}/{GameSession.MaxWillpower}).";        }
 
         // If willpower drops to zero or below, immediately give up
         if (session.PlayerWillpower <= 0)
@@ -48,8 +46,6 @@ public class TradeService
             if (!session.AvailableLocations.Contains(loc))
                 session.AvailableLocations.Add(loc);
         }
-
-        session.StatusMessage += " Chosen locations have been restored.";
     }
 
     public void GiveUp(GameSession session)
@@ -75,11 +71,11 @@ public class TradeService
         if (session.CreatureProgress >= GameSession.MaxCreatureProgress)
         {
             session.IsGameOver = true;
-            session.StatusMessage = "💀 КОНЕЦ ИГРЫ: Вы сдались. Существо вас ассимилировало. Вы поражены.";
+            session.StatusMessage = "💀 GAME OVER: You surrendered. The Creature has assimilated you. Defeat.";
         }
         else
         {
-            session.StatusMessage = "You have given up. Regain all your cards.";
+            session.StatusMessage = "[Selection] You surrendered. All your used locations have been restored. The Creature advances.";
         }
     }
 }

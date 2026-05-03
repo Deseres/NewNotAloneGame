@@ -24,17 +24,17 @@ public class SurvivalController : ControllerBase
     {
         var session = await _gameStore.GetSessionAsync(id);
         if (session == null)
-            return NotFound(new { error = "❌ Игровая сессия не найдена." });
+            return NotFound(new { error = "❌ Game session not found." });
 
         if (!session.AvailableSurvivalCards.Contains(cardId))
-            return BadRequest(new { error = $"❌ Карта {cardId} не в вашей руке." });
+            return BadRequest(new { error = $"❌ Card {cardId} is not in your hand." });
 
         var card = _survivalService.GetCardById(cardId);
         if (card == null)
-            return NotFound(new { error = $"❌ Карта {cardId} не существует." });
+            return NotFound(new { error = $"❌ Card {cardId} does not exist." });
 
         if (card.PlayablePhase != session.CurrentPhase)
-            return BadRequest(new { error = $"❌ Карта '{card.Name}' может быть сыграна только в фазе {card.PlayablePhase}. Текущая фаза: {session.CurrentPhase}." });
+            return BadRequest(new { error = $"❌ Card '{card.Name}' can only be played during the {card.PlayablePhase} phase. Current phase: {session.CurrentPhase}." });
 
         var targetLocations = request?.TargetLocationIds;
         var direction = request?.Direction;
@@ -47,22 +47,22 @@ public class SurvivalController : ControllerBase
             
             // If body is provided but contains fields not needed for this card, reject it
             if (!hasTargetLocations && !hasDirection)
-                return BadRequest(new { error = "❌ Это карта не требует параметров. Отправьте запрос без тела (body)." });
+                return BadRequest(new { error = "❌ This card does not require parameters. Send the request without a body." });
 
             if (hasTargetLocations && card.Type != SurvivalCardType.LocationsRegen)
-                return BadRequest(new { error = "❌ Эта карта не поддерживает целевые локации. Отправьте запрос без тела." });
+                return BadRequest(new { error = "❌ This card does not support target locations. Send the request without a body." });
 
             if (hasDirection && card.Type != SurvivalCardType.MoveTarget)
-                return BadRequest(new { error = "❌ Эта карта не поддерживает параметр направления. Отправьте запрос без тела." });
+                return BadRequest(new { error = "❌ This card does not support a direction parameter. Send the request without a body." });
         }
 
         // Validate that target locations don't contain invalid location 0
         if (targetLocations != null && targetLocations.Any(id => id <= 0))
-            return BadRequest(new { error = "❌ Номер локации должен быть больше 0." });
+            return BadRequest(new { error = "❌ Location number must be greater than 0." });
 
         // Validate direction for MoveTarget card
         if (card.Type == SurvivalCardType.MoveTarget && direction == null)
-            return BadRequest(new { error = "❌ Карта 'Move Target' требует параметр направления (Left или Right)." });
+            return BadRequest(new { error = "❌ The 'Move Target' card requires a direction parameter (Left or Right)." });
 
         // Validate LocationsRegen card requirements
         if (card.Type == SurvivalCardType.LocationsRegen)
@@ -83,7 +83,7 @@ public class SurvivalController : ControllerBase
 
         return Ok(new 
         { 
-            message = $"✓ Карта '{card.Name}' успешно сыграна!", 
+            message = $"✓ Card '{card.Name}' played successfully!", 
             card = card, 
             effect = session.StatusMessage,
             session = session 
