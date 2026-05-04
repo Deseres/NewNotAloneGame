@@ -40,9 +40,10 @@ namespace NotAlone.Models
         /// </summary>
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        /// <summary>
-        /// Navigation property: User's completed games
-        /// </summary>
+        // Refresh token — rotated on every use
+        public string? RefreshToken { get; set; }
+        public DateTime? RefreshTokenExpiry { get; set; }
+
         public virtual ICollection<GameHistory> GameHistories { get; set; } = new List<GameHistory>();
     }
 }

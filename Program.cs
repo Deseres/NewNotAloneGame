@@ -11,7 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Add database context
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        sql => sql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null)));
 
 // 2. Configure JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("Jwt");
@@ -97,11 +99,19 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// 5. Apply migrations on startup
+// 5. Apply migrations on startup (retry handles transient Azure SQL unavailability)
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await dbContext.Database.MigrateAsync();
+    var logger   = scope.ServiceProvider.GetRequiredService<ILogger<AppDbContext>>();
+    try
+    {
+        await dbContext.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Startup migration failed. The app will still start — retries will occur on first request.");
+    }
 }
 
 // 6. Configure middleware pipeline
